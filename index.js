@@ -7,14 +7,14 @@
     require('solc_8.4'),
   ]
   const solcsByVersion = solcs.reduce((solcsByVersion, solc) => {
-    solcsByVersion[solc.version().replace(/.*(\d+\.\d\.+\d+).*/, '$1')] = solc;
+    solcsByVersion[solc.version().replace(/.*(\d+\.\d\.+\d+).*/, '$1')] = solc
     return solcsByVersion
   }, {})
 
   const fileNames = await fs.readdir('contracts')
   const sols = await Promise.all(fileNames.map(fileName => fs.readFile(`contracts/${fileName}`, 'utf-8')))
   const solNameVersionList = fileNames.flatMap((fileName, i) => {
-    const sol = sols[i];
+    const sol = sols[i]
     const [, name, vStr] = fileName.match(/([^ ]+)((?: \d)+)?\.sol$/)
     return vStr.slice(1).split(' ').map(v => ({ name, sol, v }))
   }, {})
@@ -50,10 +50,16 @@
       console.log(err.formattedMessage)
       return
     }
-    const deployed = output.contracts[name][name].evm.deployedBytecode.object
+    const { evm } = output.contracts[name][name]
+    const { assembly, deployedBytecode } = evm
+    const { object: deployed, opcodes } = deployedBytecode
     console.log('** SUCC', fileName, '**')
     console.log('')
-    return fs.writeFile(`deployed/${fileName}`, deployed, 'utf-8')
+    return Promise.all([
+      fs.writeFile(`deployed/${fileName}`, deployed, 'utf-8'),
+      fs.writeFile(`deployed/opcodes/${name} - ${version}.asm`, opcodes, 'utf-8'),
+      fs.writeFile(`assembly/${name} - ${version}.asm`, assembly, 'utf-8'),
+    ])
   })
   await Promise.all(done)
   process.exit()

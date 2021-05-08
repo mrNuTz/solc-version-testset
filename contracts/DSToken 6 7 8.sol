@@ -413,7 +413,7 @@ contract DSToken is DSTokenBase(0), DSStop {
     event Burn(address indexed guy, uint wad);
 
     function approve(address guy) public stoppable returns (bool) {
-        return super.approve(guy, uint(2**256 - 1));
+        return super.approve(guy, type(uint).max);
     }
 
     function approve(address guy, uint wad) public override stoppable returns (bool) {
@@ -426,7 +426,7 @@ contract DSToken is DSTokenBase(0), DSStop {
         stoppable
         returns (bool)
     {
-        if (src != msg.sender && _approvals[src][msg.sender] != uint(2**256 - 1)) {
+        if (src != msg.sender && _approvals[src][msg.sender] != type(uint).max) {
             _approvals[src][msg.sender] = sub(_approvals[src][msg.sender], wad);
         }
 
@@ -460,7 +460,7 @@ contract DSToken is DSTokenBase(0), DSStop {
         emit Mint(guy, wad);
     }
     function burn(address guy, uint wad) public auth stoppable {
-        if (guy != msg.sender && _approvals[guy][msg.sender] != uint(2**256 - 1)) {
+        if (guy != msg.sender && _approvals[guy][msg.sender] != type(uint).max) {
             _approvals[guy][msg.sender] = sub(_approvals[guy][msg.sender], wad);
         }
 

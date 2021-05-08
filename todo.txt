@@ -1,7 +1,15 @@
-optimized and not optimized
+DONE:
+TODO:
+  optimized and not optimized
+NOTES:
+  5 -> 6
+    + override
+    + virtual
+    function() -> fallback() | receive()
+    constructor -> ContractName
+    .value(foo) -> {value: foo}
+    uint(-1) -> type(uint).max
 
-5 -> 6
-  add override  and virtual
-  function() to fallback() or receive()
-  replace constructor with Contract name
-  replace .value(foo) with {value: foo}
+  6 -> 5
+    interfaces cannot inherit
+    - immutable

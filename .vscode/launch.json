@@ -1,0 +1,10 @@
+{
+  "configurations": [
+    {
+      "command": "yarn start",
+      "name": "RUN",
+      "request": "launch",
+      "type": "node-terminal"
+    }
+  ]
+}

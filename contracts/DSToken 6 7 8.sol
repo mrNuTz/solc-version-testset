@@ -25,7 +25,7 @@
 abstract contract DSAuthority {
     function canCall(
         address src, address dst, bytes4 sig
-    ) public view returns (bool);
+    ) public virtual view returns (bool);
 }
 
 contract DSAuthEvents {
@@ -292,13 +292,13 @@ contract DSStop is DSNote, DSAuth {
 // https://github.com/ethereum/EIPs/issues/20
 
 abstract contract ERC20 {
-    function totalSupply() public view returns (uint supply);
-    function balanceOf( address who ) public view returns (uint value);
-    function allowance( address owner, address spender ) public view returns (uint _allowance);
+    function totalSupply() public virtual view returns (uint supply);
+    function balanceOf( address who ) public virtual view returns (uint value);
+    function allowance( address owner, address spender ) public virtual view returns (uint _allowance);
 
-    function transfer( address to, uint value) public returns (bool ok);
-    function transferFrom( address from, address to, uint value) public returns (bool ok);
-    function approve( address spender, uint value ) public returns (bool ok);
+    function transfer( address to, uint value) public virtual returns (bool ok);
+    function transferFrom( address from, address to, uint value) public virtual returns (bool ok);
+    function approve( address spender, uint value ) public virtual returns (bool ok);
 
     event Transfer( address indexed from, address indexed to, uint value);
     event Approval( address indexed owner, address indexed spender, uint value);
@@ -352,7 +352,7 @@ contract DSTokenBase is ERC20, DSMath {
     }
 
     function transferFrom(address src, address dst, uint wad)
-        public override
+        public override virtual
         returns (bool)
     {
         if (src != msg.sender) {
@@ -367,7 +367,7 @@ contract DSTokenBase is ERC20, DSMath {
         return true;
     }
 
-    function approve(address guy, uint wad) public override returns (bool) {
+    function approve(address guy, uint wad) public override virtual returns (bool) {
         _approvals[msg.sender][guy] = wad;
 
         emit Approval(msg.sender, guy, wad);

@@ -25,7 +25,14 @@
     return { name, sol, version, solc }
   })
 
-  const done = solSolcProduct.map(({ name, sol, version, solc }) => {
+  const deployedFiles = await fs.readdir('deployed');
+
+  const done = solSolcProduct.map(async ({ name, sol, version, solc }) => {
+    const fileName = `${name} - ${version}.hex`
+
+    if (deployedFiles.includes(fileName))
+      return
+
     const input = {
       language: 'Solidity',
       sources: {
@@ -43,11 +50,10 @@
     }
 
     const output = JSON.parse(solc.compile(JSON.stringify(input)))
-    const fileName = `${name} - ${version}.hex`
     if (!output.contracts) {
       console.log('** FAIL', fileName, '**')
-      const [err, ...errs] = output.errors.filter(({ type }) => type.toLowerCase().includes('error'))
-      console.log(err.formattedMessage)
+      for (err of output.errors.filter(({ type }) => type.toLowerCase().includes('error')).slice(0,3))
+        console.log(err.formattedMessage)
       return
     }
     const { evm } = output.contracts[name][name]

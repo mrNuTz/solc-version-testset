@@ -65,7 +65,7 @@ https://contracts.synthetix.io/ProxyERC20
 
 
 
-pragma solidity >=0.4.24;
+pragma solidity >=0.6.0;
 
 
 // https://docs.synthetix.io/contracts/source/interfaces/ierc20
@@ -103,7 +103,7 @@ interface IERC20 {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/owned
-contract Owned {
+abstract contract Owned {
     address public owner;
     address public nominatedOwner;
 
@@ -146,7 +146,7 @@ contract Owned {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/proxy
-contract Proxy is Owned {
+abstract contract Proxy is Owned {
     Proxyable public target;
 
     constructor(address _owner) public Owned(_owner) {}
@@ -199,16 +199,16 @@ contract Proxy is Owned {
 
         assembly {
             let free_ptr := mload(0x40)
-            calldatacopy(free_ptr, 0, calldatasize)
+            calldatacopy(free_ptr, 0, calldatasize())
 
             /* We must explicitly forward ether to the underlying contract as well. */
-            let result := call(gas, sload(target_slot), callvalue, free_ptr, calldatasize, 0, 0)
-            returndatacopy(free_ptr, 0, returndatasize)
+            let result := call(gas(), sload(target_slot), callvalue(), free_ptr, calldatasize(), 0, 0)
+            returndatacopy(free_ptr, 0, returndatasize())
 
             if iszero(result) {
-                revert(free_ptr, returndatasize)
+                revert(free_ptr, returndatasize())
             }
-            return(free_ptr, returndatasize)
+            return(free_ptr, returndatasize())
         }
     }
 
@@ -228,7 +228,7 @@ contract Proxy is Owned {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/proxyable
-contract Proxyable is Owned {
+abstract contract Proxyable is Owned {
     // This contract should be treated like an abstract contract
 
     /* The proxy this contract exists behind. */
@@ -596,7 +596,7 @@ library SafeDecimalMath {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/state
-contract State is Owned {
+abstract contract State is Owned {
     // the address of the contract that can modify variables
     // this can only be changed by the owner of this contract
     address public associatedContract;
@@ -681,7 +681,7 @@ contract TokenState is Owned, State {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/externstatetoken
-contract ExternStateToken is Owned, Proxyable {
+abstract contract ExternStateToken is Owned, Proxyable {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
@@ -999,17 +999,17 @@ contract AddressResolver is Owned, IAddressResolver {
         return true;
     }
 
-    function getAddress(bytes32 name) external view returns (address) {
+    function getAddress(bytes32 name) external override view returns (address) {
         return repository[name];
     }
 
-    function requireAndGetAddress(bytes32 name, string calldata reason) external view returns (address) {
+    function requireAndGetAddress(bytes32 name, string calldata reason) external override view returns (address) {
         address _foundAddress = repository[name];
         require(_foundAddress != address(0), reason);
         return _foundAddress;
     }
 
-    function getSynth(bytes32 key) external view returns (address) {
+    function getSynth(bytes32 key) external override view returns (address) {
         IIssuer issuer = IIssuer(repository["Issuer"]);
         require(address(issuer) != address(0), "Cannot find Issuer address");
         return address(issuer.synths(key));
@@ -1024,7 +1024,7 @@ contract AddressResolver is Owned, IAddressResolver {
 // solhint-disable payable-fallback
 
 // https://docs.synthetix.io/contracts/source/contracts/readproxy
-contract ReadProxy is Owned {
+abstract contract ReadProxy is Owned {
     address public target;
 
     constructor(address _owner) public Owned(_owner) {}
@@ -1034,20 +1034,20 @@ contract ReadProxy is Owned {
         emit TargetUpdated(target);
     }
 
-    function() external {
+    fallback() external {
         // The basics of a proxy read call
         // Note that msg.sender in the underlying will always be the address of this contract.
         assembly {
-            calldatacopy(0, 0, calldatasize)
+            calldatacopy(0, 0, calldatasize())
 
             // Use of staticcall - this will revert if the underlying function mutates state
-            let result := staticcall(gas, sload(target_slot), 0, calldatasize, 0, 0)
-            returndatacopy(0, 0, returndatasize)
+            let result := staticcall(gas(), sload(target_slot), 0, calldatasize(), 0, 0)
+            returndatacopy(0, 0, returndatasize())
 
             if iszero(result) {
-                revert(0, returndatasize)
+                revert(0, returndatasize())
             }
-            return(0, returndatasize)
+            return(0, returndatasize())
         }
     }
 
@@ -1092,7 +1092,7 @@ contract MixinResolver {
     /* ========== PUBLIC FUNCTIONS ========== */
 
     // Note: this function is public not external in order for it to be overridden and invoked via super in subclasses
-    function resolverAddressesRequired() public view returns (bytes32[] memory addresses) {}
+    function resolverAddressesRequired() public virtual view returns (bytes32[] memory addresses) {}
 
     function rebuildCache() public {
         bytes32[] memory requiredAddresses = resolverAddressesRequired();
@@ -1494,7 +1494,7 @@ interface IRewardsDistribution {
 // Internal references
 
 
-contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
+abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
     // ========== STATE VARIABLES ==========
 
     // Available Synths which can be used with the system
@@ -1527,7 +1527,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
     // ========== VIEWS ==========
 
     // Note: use public visibility so that it can be invoked in a subclass
-    function resolverAddressesRequired() public view returns (bytes32[] memory addresses) {
+    function resolverAddressesRequired() public view override returns (bytes32[] memory addresses) {
         addresses = new bytes32[](5);
         addresses[0] = CONTRACT_SYNTHETIXSTATE;
         addresses[1] = CONTRACT_SYSTEMSTATUS;
@@ -1556,52 +1556,53 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         return IRewardsDistribution(requireAndGetAddress(CONTRACT_REWARDSDISTRIBUTION));
     }
 
-    function debtBalanceOf(address account, bytes32 currencyKey) external view returns (uint) {
+    function debtBalanceOf(address account, bytes32 currencyKey) external override view returns (uint) {
         return issuer().debtBalanceOf(account, currencyKey);
     }
 
-    function totalIssuedSynths(bytes32 currencyKey) external view returns (uint) {
+    function totalIssuedSynths(bytes32 currencyKey) external override view returns (uint) {
         return issuer().totalIssuedSynths(currencyKey, false);
     }
 
-    function totalIssuedSynthsExcludeEtherCollateral(bytes32 currencyKey) external view returns (uint) {
+    function totalIssuedSynthsExcludeEtherCollateral(bytes32 currencyKey) external override view returns (uint) {
         return issuer().totalIssuedSynths(currencyKey, true);
     }
 
-    function availableCurrencyKeys() external view returns (bytes32[] memory) {
+    function availableCurrencyKeys() external override view returns (bytes32[] memory) {
         return issuer().availableCurrencyKeys();
     }
 
-    function availableSynthCount() external view returns (uint) {
+    function availableSynthCount() external override view returns (uint) {
         return issuer().availableSynthCount();
     }
 
-    function availableSynths(uint index) external view returns (ISynth) {
+    function availableSynths(uint index) external override view returns (ISynth) {
         return issuer().availableSynths(index);
     }
 
-    function synths(bytes32 currencyKey) external view returns (ISynth) {
+    function synths(bytes32 currencyKey) external override view returns (ISynth) {
         return issuer().synths(currencyKey);
     }
 
-    function synthsByAddress(address synthAddress) external view returns (bytes32) {
+    function synthsByAddress(address synthAddress) external override view returns (bytes32) {
         return issuer().synthsByAddress(synthAddress);
     }
 
-    function isWaitingPeriod(bytes32 currencyKey) external view returns (bool) {
+    function isWaitingPeriod(bytes32 currencyKey) external override view returns (bool) {
         return exchanger().maxSecsLeftInWaitingPeriod(messageSender, currencyKey) > 0;
     }
 
-    function anySynthOrSNXRateIsInvalid() external view returns (bool anyRateInvalid) {
+    function anySynthOrSNXRateIsInvalid() external override view returns (bool anyRateInvalid) {
         return issuer().anySynthOrSNXRateIsInvalid();
     }
 
-    function maxIssuableSynths(address account) external view returns (uint maxIssuable) {
+    function maxIssuableSynths(address account) external override view returns (uint maxIssuable) {
         return issuer().maxIssuableSynths(account);
     }
 
     function remainingIssuableSynths(address account)
         external
+        override
         view
         returns (
             uint maxIssuable,
@@ -1612,15 +1613,15 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         return issuer().remainingIssuableSynths(account);
     }
 
-    function collateralisationRatio(address _issuer) external view returns (uint) {
+    function collateralisationRatio(address _issuer) external override view returns (uint) {
         return issuer().collateralisationRatio(_issuer);
     }
 
-    function collateral(address account) external view returns (uint) {
+    function collateral(address account) external override view returns (uint) {
         return issuer().collateral(account);
     }
 
-    function transferableSynthetix(address account) external view returns (uint transferable) {
+    function transferableSynthetix(address account) external override view returns (uint transferable) {
         (transferable, ) = issuer().transferableSynthetixAndAnyRateIsInvalid(account, tokenState.balanceOf(account));
     }
 
@@ -1640,7 +1641,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
 
     // ========== MUTATIVE FUNCTIONS ==========
 
-    function transfer(address to, uint value) external optionalProxy systemActive returns (bool) {
+    function transfer(address to, uint value) external override optionalProxy systemActive returns (bool) {
         // Ensure they're not trying to exceed their locked amount -- only if they have debt.
         _canTransfer(messageSender, value);
 
@@ -1654,7 +1655,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         address from,
         address to,
         uint value
-    ) external optionalProxy systemActive returns (bool) {
+    ) external override optionalProxy systemActive returns (bool) {
         // Ensure they're not trying to exceed their locked amount -- only if they have debt.
         _canTransfer(from, value);
 
@@ -1663,35 +1664,35 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         return _transferFromByProxy(messageSender, from, to, value);
     }
 
-    function issueSynths(uint amount) external issuanceActive optionalProxy {
+    function issueSynths(uint amount) external override issuanceActive optionalProxy {
         return issuer().issueSynths(messageSender, amount);
     }
 
-    function issueSynthsOnBehalf(address issueForAddress, uint amount) external issuanceActive optionalProxy {
+    function issueSynthsOnBehalf(address issueForAddress, uint amount) external override issuanceActive optionalProxy {
         return issuer().issueSynthsOnBehalf(issueForAddress, messageSender, amount);
     }
 
-    function issueMaxSynths() external issuanceActive optionalProxy {
+    function issueMaxSynths() external override issuanceActive optionalProxy {
         return issuer().issueMaxSynths(messageSender);
     }
 
-    function issueMaxSynthsOnBehalf(address issueForAddress) external issuanceActive optionalProxy {
+    function issueMaxSynthsOnBehalf(address issueForAddress) external override issuanceActive optionalProxy {
         return issuer().issueMaxSynthsOnBehalf(issueForAddress, messageSender);
     }
 
-    function burnSynths(uint amount) external issuanceActive optionalProxy {
+    function burnSynths(uint amount) external override issuanceActive optionalProxy {
         return issuer().burnSynths(messageSender, amount);
     }
 
-    function burnSynthsOnBehalf(address burnForAddress, uint amount) external issuanceActive optionalProxy {
+    function burnSynthsOnBehalf(address burnForAddress, uint amount) external override issuanceActive optionalProxy {
         return issuer().burnSynthsOnBehalf(burnForAddress, messageSender, amount);
     }
 
-    function burnSynthsToTarget() external issuanceActive optionalProxy {
+    function burnSynthsToTarget() external override issuanceActive optionalProxy {
         return issuer().burnSynthsToTarget(messageSender);
     }
 
-    function burnSynthsToTargetOnBehalf(address burnForAddress) external issuanceActive optionalProxy {
+    function burnSynthsToTargetOnBehalf(address burnForAddress) external override issuanceActive optionalProxy {
         return issuer().burnSynthsToTargetOnBehalf(burnForAddress, messageSender);
     }
 
@@ -1699,7 +1700,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         bytes32,
         uint,
         bytes32
-    ) external returns (uint) {
+    ) external override returns (uint) {
         _notImplemented();
     }
 
@@ -1708,7 +1709,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         bytes32,
         uint,
         bytes32
-    ) external returns (uint) {
+    ) external override returns (uint) {
         _notImplemented();
     }
 
@@ -1718,7 +1719,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         bytes32,
         address,
         bytes32
-    ) external returns (uint) {
+    ) external override returns (uint) {
         _notImplemented();
     }
 
@@ -1729,7 +1730,7 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         bytes32,
         address,
         bytes32
-    ) external returns (uint) {
+    ) external override returns (uint) {
         _notImplemented();
     }
 
@@ -1738,12 +1739,12 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         uint,
         bytes32,
         bytes32
-    ) external returns (uint, IVirtualSynth) {
+    ) external override returns (uint, IVirtualSynth) {
         _notImplemented();
     }
 
     function settle(bytes32)
-        external
+        external override
         returns (
             uint,
             uint,
@@ -1753,23 +1754,23 @@ contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
         _notImplemented();
     }
 
-    function mint() external returns (bool) {
+    function mint() external override returns (bool) {
         _notImplemented();
     }
 
-    function liquidateDelinquentAccount(address, uint) external returns (bool) {
+    function liquidateDelinquentAccount(address, uint) external override returns (bool) {
         _notImplemented();
     }
 
-    function mintSecondary(address, uint) external {
+    function mintSecondary(address, uint) external override {
         _notImplemented();
     }
 
-    function mintSecondaryRewards(uint) external {
+    function mintSecondaryRewards(uint) external override {
         _notImplemented();
     }
 
-    function burnSecondary(address, uint) external {
+    function burnSecondary(address, uint) external override {
         _notImplemented();
     }
 
@@ -1948,7 +1949,7 @@ contract Synthetix is BaseSynthetix {
         address _resolver
     ) public BaseSynthetix(_proxy, _tokenState, _owner, _totalSupply, _resolver) {}
 
-    function resolverAddressesRequired() public view returns (bytes32[] memory addresses) {
+    function resolverAddressesRequired() public override view returns (bytes32[] memory addresses) {
         bytes32[] memory existingAddresses = BaseSynthetix.resolverAddressesRequired();
         bytes32[] memory newAddresses = new bytes32[](3);
         newAddresses[0] = CONTRACT_REWARD_ESCROW;

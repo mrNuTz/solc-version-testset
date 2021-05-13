@@ -37,8 +37,6 @@
                                                              `"▀▀▀████████▀▀▀▀`▄███▀▀└
                                                                               └└
 
-
-
                     11\   11\                     11\             11\   11\            11\                                       11\
                   1111 |  \__|                    11 |            111\  11 |           11 |                                      11 |
                   \_11 |  11\ 1111111\   1111111\ 1111111\        1111\ 11 | 111111\ 111111\   11\  11\  11\  111111\   111111\  11 |  11\
@@ -47,8 +45,6 @@
                     11 |  11 |11 |  11 |11 |      11 |  11 |      11 |\111 |11   ____| 11 |11\ 11 | 11 | 11 |11 |  11 |11 |      11  _11<
                   111111\ 11 |11 |  11 |\1111111\ 11 |  11 |      11 | \11 |\1111111\  \1111  |\11111\1111  |\111111  |11 |      11 | \11\
                   \______|\__|\__|  \__| \_______|\__|  \__|      \__|  \__| \_______|  \____/  \_____\____/  \______/ \__|      \__|  \__|
-
-
 
                                111111\                                                               11\     11\
                               11  __11\                                                              11 |    \__|
@@ -75,7 +71,7 @@
 
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity >=0.7.0 <0.8.0;
 
 /*
  * @dev Provides information about the current execution context, including the
@@ -98,12 +94,7 @@ abstract contract Context {
     }
 }
 
-
 // File @openzeppelin/contracts/access/Ownable.sol@v3.4.1
-
-
-
-pragma solidity >=0.6.0 <0.8.0;
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -169,12 +160,7 @@ abstract contract Ownable is Context {
     }
 }
 
-
 // File @openzeppelin/contracts/token/ERC20/IERC20.sol@v3.4.1
-
-
-
-pragma solidity >=0.6.0 <0.8.0;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
@@ -250,12 +236,7 @@ interface IERC20 {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-
 // File @openzeppelin/contracts/math/SafeMath.sol@v3.4.1
-
-
-
-pragma solidity >=0.6.0 <0.8.0;
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations with added overflow
@@ -468,12 +449,7 @@ library SafeMath {
     }
 }
 
-
 // File @openzeppelin/contracts/utils/Address.sol@v3.4.1
-
-
-
-pragma solidity >=0.6.2 <0.8.0;
 
 /**
  * @dev Collection of functions related to the address type
@@ -661,14 +637,7 @@ library Address {
     }
 }
 
-
 // File @openzeppelin/contracts/token/ERC20/SafeERC20.sol@v3.4.1
-
-
-
-pragma solidity >=0.6.0 <0.8.0;
-
-
 
 /**
  * @title SafeERC20
@@ -738,13 +707,7 @@ library SafeERC20 {
     }
 }
 
-
 // File contracts/helpers/UniERC20.sol
-
-
-
-pragma solidity ^0.6.12;
-
 
 library UniERC20 {
     using SafeMath for uint256;
@@ -797,12 +760,7 @@ library UniERC20 {
     }
 }
 
-
 // File contracts/interfaces/IChi.sol
-
-
-
-pragma solidity ^0.6.12;
 
 interface IChi is IERC20 {
     function mint(uint256 value) external;
@@ -810,35 +768,19 @@ interface IChi is IERC20 {
     function freeFromUpTo(address from, uint256 value) external returns (uint256 freed);
 }
 
-
 // File contracts/interfaces/IGasDiscountExtension.sol
-
-
-
-pragma solidity ^0.6.12;
 
 interface IGasDiscountExtension {
     function calculateGas(uint256 gasUsed, uint256 flags, uint256 calldataLength) external view returns (IChi, uint256);
 }
 
-
 // File contracts/interfaces/IAggregationExecutor.sol
-
-
-
-pragma solidity ^0.6.12;
 
 interface IAggregationExecutor is IGasDiscountExtension {
     function callBytes(bytes calldata data) external payable;  // 0xd9c45357
 }
 
-
 // File contracts/helpers/RevertReasonParser.sol
-
-
-
-pragma solidity ^0.6.12;
-
 
 library RevertReasonParser {
     function parse(bytes memory data, string memory prefix) internal pure returns (string memory) {
@@ -894,26 +836,13 @@ library RevertReasonParser {
     }
 }
 
-
 // File contracts/interfaces/IERC20Permit.sol
-
-
-
-pragma solidity ^0.6.12;
-
 
 interface IERC20Permit {
     function permit(address owner, address spender, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
 }
 
-
 // File contracts/helpers/Permitable.sol
-
-
-
-pragma solidity ^0.6.12;
-
-
 
 contract Permitable {
     event Error(
@@ -936,12 +865,7 @@ contract Permitable {
     }
 }
 
-
 // File contracts/UnoswapRouter.sol
-
-
-
-pragma solidity ^0.6.12;
 
 contract UnoswapRouter is Permitable {
     uint256 private constant _TRANSFER_FROM_CALL_SELECTOR_32 = 0x23b872dd00000000000000000000000000000000000000000000000000000000;
@@ -1123,18 +1047,9 @@ contract UnoswapRouter is Permitable {
     }
 }
 
-
 // File contracts/AggregationRouterV3.sol
 
-
-
-pragma solidity ^0.6.12;
 pragma experimental ABIEncoderV2;
-
-
-
-
-
 
 contract AggregationRouterV3 is Ownable, UnoswapRouter {
     using SafeMath for uint256;

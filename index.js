@@ -65,6 +65,7 @@
       fs.writeFile(`deployed/${fileName}`, deployed, 'utf-8'),
       fs.writeFile(`deployed/opcodes/${name} - ${version}.asm`, opcodes, 'utf-8'),
       fs.writeFile(`assembly/${name} - ${version}.asm`, assembly, 'utf-8'),
+      //fs.writeFile(`output/${name} - ${version}.json`, JSON.stringify(output, null, 2), 'utf-8'),
     ])
   })
   await Promise.all(done)

@@ -4,10 +4,12 @@
   "main": "index.mjs",
   "private": true,
   "dependencies": {
-    "solc_8.4": "npm:solc@0.8.4",
-    "solc_7.6": "npm:solc@0.7.6",
+    "axios": "^0.21.1",
+    "jsdom": "^16.5.3",
+    "solc_5.16": "npm:solc@0.5.16",
     "solc_6.12": "npm:solc@0.6.12",
-    "solc_5.16": "npm:solc@0.5.16"
+    "solc_7.6": "npm:solc@0.7.6",
+    "solc_8.4": "npm:solc@0.8.4"
   },
   "scripts": {
     "start": "node index.js"

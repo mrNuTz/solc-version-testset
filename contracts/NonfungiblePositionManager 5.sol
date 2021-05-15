@@ -1032,7 +1032,7 @@ contract ERC165 is IERC165 {
 /**
  * @dev Required interface of an ERC721 compliant contract.
  */
-interface IERC721 is IERC165 {
+interface IERC721 {
     /**
      * @dev Emitted when `tokenId` token is transferred from `from` to `to`.
      */
@@ -1429,7 +1429,7 @@ library Address {
  * @title ERC-721 Non-Fungible Token Standard, optional metadata extension
  * @dev See https://eips.ethereum.org/EIPS/eip-721
  */
-interface IERC721Metadata is IERC721 {
+interface IERC721Metadata {
 
     /**
      * @dev Returns the token collection name.
@@ -1452,7 +1452,7 @@ interface IERC721Metadata is IERC721 {
  * @title ERC-721 Non-Fungible Token Standard, optional enumeration extension
  * @dev See https://eips.ethereum.org/EIPS/eip-721
  */
-interface IERC721Enumerable is IERC721 {
+interface IERC721Enumerable {
 
     /**
      * @dev Returns the total amount of tokens stored by the contract.
@@ -1965,7 +1965,7 @@ library TransferHelper {
         uint256 value
     ) internal {
         (bool success, bytes memory data) =
-            token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
+            token.call(abi.encodeWithSelector(bytes4(0x23b872dd), from, to, value));
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'STF');
     }
 
@@ -1979,23 +1979,10 @@ library TransferHelper {
         address to,
         uint256 value
     ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, value));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(bytes4(0xa9059cbb), to, value));
         require(success && (data.length == 0 || abi.decode(data, (bool))), 'ST');
     }
 
-    /// @notice Approves the stipulated contract to spend the given allowance in the given token
-    /// @dev Errors with 'SA' if transfer fails
-    /// @param token The contract address of the token to be approved
-    /// @param to The target of the approval
-    /// @param value The amount of the given token the target will be allowed to spend
-    function safeApprove(
-        address token,
-        address to,
-        uint256 value
-    ) internal {
-        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(IERC20.approve.selector, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), 'SA');
-    }
 
     /// @notice Transfers ETH to the recipient address
     /// @dev Fails with `STE`
@@ -2084,7 +2071,7 @@ interface IERC20 {
 
 
 /// @title Interface for WETH9
-interface IWETH9 is IERC20 {
+interface IWETH9 {
     /// @notice Deposit ether to get wrapped ether
     function deposit() external payable;
 
@@ -2164,7 +2151,7 @@ contract PeripheryPayments is IPeripheryPayments, PeripheryImmutableState {
 
     /// inheritdoc IPeripheryPayments
     function unwrapWETH9(uint256 amountMinimum, address recipient) external payable {
-        uint256 balanceWETH9 = IWETH9(WETH9).balanceOf(address(this));
+        uint256 balanceWETH9 = IERC20(WETH9).balanceOf(address(this));
         require(balanceWETH9 >= amountMinimum, 'Insufficient WETH9');
 
         if (balanceWETH9 > 0) {
@@ -2205,7 +2192,7 @@ contract PeripheryPayments is IPeripheryPayments, PeripheryImmutableState {
         if (token == WETH9 && address(this).balance >= value) {
             // pay with WETH9
             IWETH9(WETH9).deposit.value(value)(); // wrap only what is needed to pay
-            IWETH9(WETH9).transfer(recipient, value);
+            IERC20(WETH9).transfer(recipient, value);
         } else if (payer == address(this)) {
             // pay with tokens already in the contract (for the exact input multihop case)
             TransferHelper.safeTransfer(token, recipient, value);
@@ -2240,7 +2227,7 @@ library LiquidityAmounts {
         uint256 amount0
     ) internal pure returns (uint128 liquidity) {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
-        uint256 intermediate = FullMath.mulDiv(sqrtRatioAX96, sqrtRatioBX96, FixedPoint96.Q96);
+        uint256 intermediate = FullMath.mulDiv(sqrtRatioAX96, sqrtRatioBX96, uint256(0x1000000000000000000000000));
         return toUint128(FullMath.mulDiv(amount0, intermediate, sqrtRatioBX96 - sqrtRatioAX96));
     }
 
@@ -2256,7 +2243,7 @@ library LiquidityAmounts {
         uint256 amount1
     ) internal pure returns (uint128 liquidity) {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
-        return toUint128(FullMath.mulDiv(amount1, FixedPoint96.Q96, sqrtRatioBX96 - sqrtRatioAX96));
+        return toUint128(FullMath.mulDiv(amount1, uint256(0x1000000000000000000000000), sqrtRatioBX96 - sqrtRatioAX96));
     }
 
     /// @notice Computes the maximum amount of liquidity received for a given amount of token0, token1, the current
@@ -2302,7 +2289,7 @@ library LiquidityAmounts {
 
         return
             FullMath.mulDiv(
-                uint256(liquidity) << FixedPoint96.RESOLUTION,
+                uint256(liquidity) << uint8(96),
                 sqrtRatioBX96 - sqrtRatioAX96,
                 sqrtRatioBX96
             ) / sqrtRatioAX96;
@@ -2320,7 +2307,7 @@ library LiquidityAmounts {
     ) internal pure returns (uint256 amount1) {
         if (sqrtRatioAX96 > sqrtRatioBX96) (sqrtRatioAX96, sqrtRatioBX96) = (sqrtRatioBX96, sqrtRatioAX96);
 
-        return FullMath.mulDiv(liquidity, sqrtRatioBX96 - sqrtRatioAX96, FixedPoint96.Q96);
+        return FullMath.mulDiv(liquidity, sqrtRatioBX96 - sqrtRatioAX96, uint256(0x1000000000000000000000000));
     }
 
     /// @notice Computes the token0 and token1 value for a given amount of liquidity, the current
@@ -2429,7 +2416,7 @@ library TickMath {
         if (absTick & 0x40000 != 0) ratio = (ratio * 0x2216e584f5fa1ea926041bedfe98) >> 128;
         if (absTick & 0x80000 != 0) ratio = (ratio * 0x48a170391f7dc42444e8fa2) >> 128;
 
-        if (tick > 0) ratio = type(uint256).max / ratio;
+        if (tick > 0) ratio = uint256(-1) / ratio;
 
         // this divides by 1<<32 rounding up to go from a Q128.128 to a Q128.96.
         // we then downcast because we know the result always fits within 160 bits due to our tick input constraint
@@ -2687,7 +2674,7 @@ interface IUniswapV3Factory {
 
 /// @title ERC721 with permit
 /// @notice Extension to ERC721 that includes a permit function for signature based approvals
-interface IERC721Permit is IERC721 {
+interface IERC721Permit {
     /// @notice The permit typehash used in the permit signature
     /// @return The typehash for the permit
     function PERMIT_TYPEHASH() external pure returns (bytes32);
@@ -2879,110 +2866,6 @@ interface IUniswapV3PoolOwnerActions {
 }
 
 
-
-/// @title Permissionless pool actions
-/// @notice Contains pool methods that can be called by anyone
-interface IUniswapV3PoolActions {
-    /// @notice Sets the initial price for the pool
-    /// @dev Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
-    /// @param sqrtPriceX96 the initial sqrt price of the pool as a Q64.96
-    function initialize(uint160 sqrtPriceX96) external;
-
-    /// @notice Adds liquidity for the given recipient/tickLower/tickUpper position
-    /// @dev The caller of this method receives a callback in the form of IUniswapV3MintCallback#uniswapV3MintCallback
-    /// in which they must pay any token0 or token1 owed for the liquidity. The amount of token0/token1 due depends
-    /// on tickLower, tickUpper, the amount of liquidity, and the current price.
-    /// @param recipient The address for which the liquidity will be created
-    /// @param tickLower The lower tick of the position in which to add liquidity
-    /// @param tickUpper The upper tick of the position in which to add liquidity
-    /// @param amount The amount of liquidity to mint
-    /// @param data Any data that should be passed through to the callback
-    /// @return amount0 The amount of token0 that was paid to mint the given amount of liquidity. Matches the value in the callback
-    /// @return amount1 The amount of token1 that was paid to mint the given amount of liquidity. Matches the value in the callback
-    function mint(
-        address recipient,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 amount,
-        bytes calldata data
-    ) external returns (uint256 amount0, uint256 amount1);
-
-    /// @notice Collects tokens owed to a position
-    /// @dev Does not recompute fees earned, which must be done either via mint or burn of any amount of liquidity.
-    /// Collect must be called by the position owner. To withdraw only token0 or only token1, amount0Requested or
-    /// amount1Requested may be set to zero. To withdraw all tokens owed, caller may pass any value greater than the
-    /// actual tokens owed, e.g. type(uint128).max. Tokens owed may be from accumulated swap fees or burned liquidity.
-    /// @param recipient The address which should receive the fees collected
-    /// @param tickLower The lower tick of the position for which to collect fees
-    /// @param tickUpper The upper tick of the position for which to collect fees
-    /// @param amount0Requested How much token0 should be withdrawn from the fees owed
-    /// @param amount1Requested How much token1 should be withdrawn from the fees owed
-    /// @return amount0 The amount of fees collected in token0
-    /// @return amount1 The amount of fees collected in token1
-    function collect(
-        address recipient,
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 amount0Requested,
-        uint128 amount1Requested
-    ) external returns (uint128 amount0, uint128 amount1);
-
-    /// @notice Burn liquidity from the sender and account tokens owed for the liquidity to the position
-    /// @dev Can be used to trigger a recalculation of fees owed to a position by calling with an amount of 0
-    /// @dev Fees must be collected separately via a call to #collect
-    /// @param tickLower The lower tick of the position for which to burn liquidity
-    /// @param tickUpper The upper tick of the position for which to burn liquidity
-    /// @param amount How much liquidity to burn
-    /// @return amount0 The amount of token0 sent to the recipient
-    /// @return amount1 The amount of token1 sent to the recipient
-    function burn(
-        int24 tickLower,
-        int24 tickUpper,
-        uint128 amount
-    ) external returns (uint256 amount0, uint256 amount1);
-
-    /// @notice Swap token0 for token1, or token1 for token0
-    /// @dev The caller of this method receives a callback in the form of IUniswapV3SwapCallback#uniswapV3SwapCallback
-    /// @param recipient The address to receive the output of the swap
-    /// @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
-    /// @param amountSpecified The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
-    /// @param sqrtPriceLimitX96 The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this
-    /// value after the swap. If one for zero, the price cannot be greater than this value after the swap
-    /// @param data Any data to be passed through to the callback
-    /// @return amount0 The delta of the balance of token0 of the pool, exact when negative, minimum when positive
-    /// @return amount1 The delta of the balance of token1 of the pool, exact when negative, minimum when positive
-    function swap(
-        address recipient,
-        bool zeroForOne,
-        int256 amountSpecified,
-        uint160 sqrtPriceLimitX96,
-        bytes calldata data
-    ) external returns (int256 amount0, int256 amount1);
-
-    /// @notice Receive token0 and/or token1 and pay it back, plus a fee, in the callback
-    /// @dev The caller of this method receives a callback in the form of IUniswapV3FlashCallback#uniswapV3FlashCallback
-    /// @dev Can be used to donate underlying tokens pro-rata to currently in-range liquidity providers by calling
-    /// with 0 amount{0,1} and sending the donation amount(s) from the callback
-    /// @param recipient The address which will receive the token0 and token1 amounts
-    /// @param amount0 The amount of token0 to send
-    /// @param amount1 The amount of token1 to send
-    /// @param data Any data to be passed through to the callback
-    function flash(
-        address recipient,
-        uint256 amount0,
-        uint256 amount1,
-        bytes calldata data
-    ) external;
-
-    /// @notice Increase the maximum number of price and liquidity observations that this pool will store
-    /// @dev This method is no-op if the pool already has an observationCardinalityNext greater than or equal to
-    /// the input observationCardinalityNext.
-    /// @param observationCardinalityNext The desired minimum number of observations for the pool to store
-    function increaseObservationCardinalityNext(uint16 observationCardinalityNext) external;
-}
-
-
-
 /// @title Pool state that is not stored
 /// @notice Contains view functions to provide information about the pool that is computed rather than stored on the
 /// blockchain. The functions here may have variable gas costs.
@@ -3021,121 +2904,6 @@ interface IUniswapV3PoolDerivedState {
         );
 }
 
-
-
-/// @title Pool state that can change
-/// @notice These methods compose the pool's state, and can change with any frequency including multiple times
-/// per transaction
-interface IUniswapV3PoolState {
-    /// @notice The 0th storage slot in the pool stores many values, and is exposed as a single method to save gas
-    /// when accessed externally.
-    /// @return sqrtPriceX96 The current price of the pool as a sqrt(token1/token0) Q64.96 value
-    /// tick The current tick of the pool, i.e. according to the last tick transition that was run.
-    /// This value may not always be equal to SqrtTickMath.getTickAtSqrtRatio(sqrtPriceX96) if the price is on a tick
-    /// boundary.
-    /// observationIndex The index of the last oracle observation that was written,
-    /// observationCardinality The current maximum number of observations stored in the pool,
-    /// observationCardinalityNext The next maximum number of observations, to be updated when the observation.
-    /// feeProtocol The protocol fee for both tokens of the pool.
-    /// Encoded as two 4 bit values, where the protocol fee of token1 is shifted 4 bits and the protocol fee of token0
-    /// is the lower 4 bits. Used as the denominator of a fraction of the swap fee, e.g. 4 means 1/4th of the swap fee.
-    /// unlocked Whether the pool is currently locked to reentrancy
-    function slot0()
-        external
-        view
-        returns (
-            uint160 sqrtPriceX96,
-            int24 tick,
-            uint16 observationIndex,
-            uint16 observationCardinality,
-            uint16 observationCardinalityNext,
-            uint8 feeProtocol,
-            bool unlocked
-        );
-
-    /// @notice The fee growth as a Q128.128 fees of token0 collected per unit of liquidity for the entire life of the pool
-    /// @dev This value can overflow the uint256
-    function feeGrowthGlobal0X128() external view returns (uint256);
-
-    /// @notice The fee growth as a Q128.128 fees of token1 collected per unit of liquidity for the entire life of the pool
-    /// @dev This value can overflow the uint256
-    function feeGrowthGlobal1X128() external view returns (uint256);
-
-    /// @notice The amounts of token0 and token1 that are owed to the protocol
-    /// @dev Protocol fees will never exceed uint128 max in either token
-    function protocolFees() external view returns (uint128 token0, uint128 token1);
-
-    /// @notice The currently in range liquidity available to the pool
-    /// @dev This value has no relationship to the total liquidity across all ticks
-    function liquidity() external view returns (uint128);
-
-    /// @notice Look up information about a specific tick in the pool
-    /// @param tick The tick to look up
-    /// @return liquidityGross the total amount of position liquidity that uses the pool either as tick lower or
-    /// tick upper,
-    /// liquidityNet how much liquidity changes when the pool price crosses the tick,
-    /// feeGrowthOutside0X128 the fee growth on the other side of the tick from the current tick in token0,
-    /// feeGrowthOutside1X128 the fee growth on the other side of the tick from the current tick in token1,
-    /// tickCumulativeOutside the cumulative tick value on the other side of the tick from the current tick
-    /// secondsPerLiquidityOutsideX128 the seconds spent per liquidity on the other side of the tick from the current tick,
-    /// secondsOutside the seconds spent on the other side of the tick from the current tick,
-    /// initialized Set to true if the tick is initialized, i.e. liquidityGross is greater than 0, otherwise equal to false.
-    /// Outside values can only be used if the tick is initialized, i.e. if liquidityGross is greater than 0.
-    /// In addition, these values are only relative and must be used only in comparison to previous snapshots for
-    /// a specific position.
-    function ticks(int24 tick)
-        external
-        view
-        returns (
-            uint128 liquidityGross,
-            int128 liquidityNet,
-            uint256 feeGrowthOutside0X128,
-            uint256 feeGrowthOutside1X128,
-            int56 tickCumulativeOutside,
-            uint160 secondsPerLiquidityOutsideX128,
-            uint32 secondsOutside,
-            bool initialized
-        );
-
-    /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
-    function tickBitmap(int16 wordPosition) external view returns (uint256);
-
-    /// @notice Returns the information about a position by the position's key
-    /// @param key The position's key is a hash of a preimage composed by the owner, tickLower and tickUpper
-    /// @return _liquidity The amount of liquidity in the position,
-    /// Returns feeGrowthInside0LastX128 fee growth of token0 inside the tick range as of the last mint/burn/poke,
-    /// Returns feeGrowthInside1LastX128 fee growth of token1 inside the tick range as of the last mint/burn/poke,
-    /// Returns tokensOwed0 the computed amount of token0 owed to the position as of the last mint/burn/poke,
-    /// Returns tokensOwed1 the computed amount of token1 owed to the position as of the last mint/burn/poke
-    function positions(bytes32 key)
-        external
-        view
-        returns (
-            uint128 _liquidity,
-            uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
-        );
-
-    /// @notice Returns data about a specific observation index
-    /// @param index The element of the observations array to fetch
-    /// @dev You most likely want to use #observe() instead of this method to get an observation as of some amount of time
-    /// ago, rather than at a specific index in the array.
-    /// @return blockTimestamp The timestamp of the observation,
-    /// Returns tickCumulative the tick multiplied by seconds elapsed for the life of the pool as of the observation timestamp,
-    /// Returns secondsPerLiquidityCumulativeX128 the seconds per in range liquidity for the life of the pool as of the observation timestamp,
-    /// Returns initialized whether the observation has been initialized and the values are safe to use
-    function observations(uint256 index)
-        external
-        view
-        returns (
-            uint32 blockTimestamp,
-            int56 tickCumulative,
-            uint160 secondsPerLiquidityCumulativeX128,
-            bool initialized
-        );
-}
 
 
 
@@ -3250,7 +3018,7 @@ contract SelfPermit is ISelfPermit {
         bytes32 r,
         bytes32 s
     ) external payable {
-        if (IERC20(token).allowance(msg.sender, address(this)) < type(uint256).max)
+        if (IERC20(token).allowance(msg.sender, address(this)) < uint256(-1))
             selfPermitAllowed(token, nonce, expiry, v, r, s);
     }
 }
@@ -3420,7 +3188,7 @@ contract LiquidityManagement is IUniswapV3MintCallback, PeripheryImmutableState,
 
         // compute the liquidity amount
         {
-            (uint160 sqrtPriceX96, , , , , , ) = pool.slot0();
+            (uint160 sqrtPriceX96, , , , , , ) = IUniswapV3Pool(pool).slot0();
             uint160 sqrtRatioAX96 = TickMath.getSqrtRatioAtTick(params.tickLower);
             uint160 sqrtRatioBX96 = TickMath.getSqrtRatioAtTick(params.tickUpper);
 
@@ -3433,7 +3201,7 @@ contract LiquidityManagement is IUniswapV3MintCallback, PeripheryImmutableState,
             );
         }
 
-        (amount0, amount1) = pool.mint(
+        (amount0, amount1) = IUniswapV3Pool(pool).mint(
             params.recipient,
             params.tickLower,
             params.tickUpper,
@@ -3532,14 +3300,7 @@ interface INonfungibleTokenPositionDescriptor {
 /// @title Non-fungible token for positions
 /// @notice Wraps Uniswap V3 positions in a non-fungible token interface which allows for them to be transferred
 /// and authorized.
-interface INonfungiblePositionManager is
-    IPoolInitializer,
-    IPeripheryPayments,
-    IPeripheryImmutableState,
-    IERC721Metadata,
-    IERC721Enumerable,
-    IERC721Permit
-{
+interface INonfungiblePositionManager {
     /// @notice Emitted when liquidity is increased for a position NFT
     /// @dev Also emitted when a token is minted
     /// @param tokenId The ID of the token for which liquidity was increased
@@ -3815,7 +3576,7 @@ library FullMath {
     ) internal pure returns (uint256 result) {
         result = mulDiv(a, b, denominator);
         if (mulmod(a, b, denominator) > 0) {
-            require(result < type(uint256).max);
+            require(result < uint256(-1));
             result++;
         }
     }
@@ -3835,15 +3596,215 @@ library FixedPoint128 {
 /// @notice A Uniswap pool facilitates swapping and automated market making between any two assets that strictly conform
 /// to the ERC20 specification
 /// @dev The pool interface is broken up into many smaller pieces
-interface IUniswapV3Pool is
-    IUniswapV3PoolImmutables,
-    IUniswapV3PoolState,
-    IUniswapV3PoolDerivedState,
-    IUniswapV3PoolActions,
-    IUniswapV3PoolOwnerActions,
-    IUniswapV3PoolEvents
+interface IUniswapV3Pool
 {
+    /// @notice The 0th storage slot in the pool stores many values, and is exposed as a single method to save gas
+    /// when accessed externally.
+    /// @return sqrtPriceX96 The current price of the pool as a sqrt(token1/token0) Q64.96 value
+    /// tick The current tick of the pool, i.e. according to the last tick transition that was run.
+    /// This value may not always be equal to SqrtTickMath.getTickAtSqrtRatio(sqrtPriceX96) if the price is on a tick
+    /// boundary.
+    /// observationIndex The index of the last oracle observation that was written,
+    /// observationCardinality The current maximum number of observations stored in the pool,
+    /// observationCardinalityNext The next maximum number of observations, to be updated when the observation.
+    /// feeProtocol The protocol fee for both tokens of the pool.
+    /// Encoded as two 4 bit values, where the protocol fee of token1 is shifted 4 bits and the protocol fee of token0
+    /// is the lower 4 bits. Used as the denominator of a fraction of the swap fee, e.g. 4 means 1/4th of the swap fee.
+    /// unlocked Whether the pool is currently locked to reentrancy
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
 
+    /// @notice The fee growth as a Q128.128 fees of token0 collected per unit of liquidity for the entire life of the pool
+    /// @dev This value can overflow the uint256
+    function feeGrowthGlobal0X128() external view returns (uint256);
+
+    /// @notice The fee growth as a Q128.128 fees of token1 collected per unit of liquidity for the entire life of the pool
+    /// @dev This value can overflow the uint256
+    function feeGrowthGlobal1X128() external view returns (uint256);
+
+    /// @notice The amounts of token0 and token1 that are owed to the protocol
+    /// @dev Protocol fees will never exceed uint128 max in either token
+    function protocolFees() external view returns (uint128 token0, uint128 token1);
+
+    /// @notice The currently in range liquidity available to the pool
+    /// @dev This value has no relationship to the total liquidity across all ticks
+    function liquidity() external view returns (uint128);
+
+    /// @notice Look up information about a specific tick in the pool
+    /// @param tick The tick to look up
+    /// @return liquidityGross the total amount of position liquidity that uses the pool either as tick lower or
+    /// tick upper,
+    /// liquidityNet how much liquidity changes when the pool price crosses the tick,
+    /// feeGrowthOutside0X128 the fee growth on the other side of the tick from the current tick in token0,
+    /// feeGrowthOutside1X128 the fee growth on the other side of the tick from the current tick in token1,
+    /// tickCumulativeOutside the cumulative tick value on the other side of the tick from the current tick
+    /// secondsPerLiquidityOutsideX128 the seconds spent per liquidity on the other side of the tick from the current tick,
+    /// secondsOutside the seconds spent on the other side of the tick from the current tick,
+    /// initialized Set to true if the tick is initialized, i.e. liquidityGross is greater than 0, otherwise equal to false.
+    /// Outside values can only be used if the tick is initialized, i.e. if liquidityGross is greater than 0.
+    /// In addition, these values are only relative and must be used only in comparison to previous snapshots for
+    /// a specific position.
+    function ticks(int24 tick)
+        external
+        view
+        returns (
+            uint128 liquidityGross,
+            int128 liquidityNet,
+            uint256 feeGrowthOutside0X128,
+            uint256 feeGrowthOutside1X128,
+            int56 tickCumulativeOutside,
+            uint160 secondsPerLiquidityOutsideX128,
+            uint32 secondsOutside,
+            bool initialized
+        );
+
+    /// @notice Returns 256 packed tick initialized boolean values. See TickBitmap for more information
+    function tickBitmap(int16 wordPosition) external view returns (uint256);
+
+    /// @notice Returns the information about a position by the position's key
+    /// @param key The position's key is a hash of a preimage composed by the owner, tickLower and tickUpper
+    /// @return _liquidity The amount of liquidity in the position,
+    /// Returns feeGrowthInside0LastX128 fee growth of token0 inside the tick range as of the last mint/burn/poke,
+    /// Returns feeGrowthInside1LastX128 fee growth of token1 inside the tick range as of the last mint/burn/poke,
+    /// Returns tokensOwed0 the computed amount of token0 owed to the position as of the last mint/burn/poke,
+    /// Returns tokensOwed1 the computed amount of token1 owed to the position as of the last mint/burn/poke
+    function positions(bytes32 key)
+        external
+        view
+        returns (
+            uint128 _liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        );
+
+    /// @notice Returns data about a specific observation index
+    /// @param index The element of the observations array to fetch
+    /// @dev You most likely want to use #observe() instead of this method to get an observation as of some amount of time
+    /// ago, rather than at a specific index in the array.
+    /// @return blockTimestamp The timestamp of the observation,
+    /// Returns tickCumulative the tick multiplied by seconds elapsed for the life of the pool as of the observation timestamp,
+    /// Returns secondsPerLiquidityCumulativeX128 the seconds per in range liquidity for the life of the pool as of the observation timestamp,
+    /// Returns initialized whether the observation has been initialized and the values are safe to use
+    function observations(uint256 index)
+        external
+        view
+        returns (
+            uint32 blockTimestamp,
+            int56 tickCumulative,
+            uint160 secondsPerLiquidityCumulativeX128,
+            bool initialized
+        );
+
+
+
+    /// @notice Sets the initial price for the pool
+    /// @dev Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
+    /// @param sqrtPriceX96 the initial sqrt price of the pool as a Q64.96
+    function initialize(uint160 sqrtPriceX96) external;
+
+    /// @notice Adds liquidity for the given recipient/tickLower/tickUpper position
+    /// @dev The caller of this method receives a callback in the form of IUniswapV3MintCallback#uniswapV3MintCallback
+    /// in which they must pay any token0 or token1 owed for the liquidity. The amount of token0/token1 due depends
+    /// on tickLower, tickUpper, the amount of liquidity, and the current price.
+    /// @param recipient The address for which the liquidity will be created
+    /// @param tickLower The lower tick of the position in which to add liquidity
+    /// @param tickUpper The upper tick of the position in which to add liquidity
+    /// @param amount The amount of liquidity to mint
+    /// @param data Any data that should be passed through to the callback
+    /// @return amount0 The amount of token0 that was paid to mint the given amount of liquidity. Matches the value in the callback
+    /// @return amount1 The amount of token1 that was paid to mint the given amount of liquidity. Matches the value in the callback
+    function mint(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount,
+        bytes calldata data
+    ) external returns (uint256 amount0, uint256 amount1);
+
+    /// @notice Collects tokens owed to a position
+    /// @dev Does not recompute fees earned, which must be done either via mint or burn of any amount of liquidity.
+    /// Collect must be called by the position owner. To withdraw only token0 or only token1, amount0Requested or
+    /// amount1Requested may be set to zero. To withdraw all tokens owed, caller may pass any value greater than the
+    /// actual tokens owed, e.g. type(uint128).max. Tokens owed may be from accumulated swap fees or burned liquidity.
+    /// @param recipient The address which should receive the fees collected
+    /// @param tickLower The lower tick of the position for which to collect fees
+    /// @param tickUpper The upper tick of the position for which to collect fees
+    /// @param amount0Requested How much token0 should be withdrawn from the fees owed
+    /// @param amount1Requested How much token1 should be withdrawn from the fees owed
+    /// @return amount0 The amount of fees collected in token0
+    /// @return amount1 The amount of fees collected in token1
+    function collect(
+        address recipient,
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount0Requested,
+        uint128 amount1Requested
+    ) external returns (uint128 amount0, uint128 amount1);
+
+    /// @notice Burn liquidity from the sender and account tokens owed for the liquidity to the position
+    /// @dev Can be used to trigger a recalculation of fees owed to a position by calling with an amount of 0
+    /// @dev Fees must be collected separately via a call to #collect
+    /// @param tickLower The lower tick of the position for which to burn liquidity
+    /// @param tickUpper The upper tick of the position for which to burn liquidity
+    /// @param amount How much liquidity to burn
+    /// @return amount0 The amount of token0 sent to the recipient
+    /// @return amount1 The amount of token1 sent to the recipient
+    function burn(
+        int24 tickLower,
+        int24 tickUpper,
+        uint128 amount
+    ) external returns (uint256 amount0, uint256 amount1);
+
+    /// @notice Swap token0 for token1, or token1 for token0
+    /// @dev The caller of this method receives a callback in the form of IUniswapV3SwapCallback#uniswapV3SwapCallback
+    /// @param recipient The address to receive the output of the swap
+    /// @param zeroForOne The direction of the swap, true for token0 to token1, false for token1 to token0
+    /// @param amountSpecified The amount of the swap, which implicitly configures the swap as exact input (positive), or exact output (negative)
+    /// @param sqrtPriceLimitX96 The Q64.96 sqrt price limit. If zero for one, the price cannot be less than this
+    /// value after the swap. If one for zero, the price cannot be greater than this value after the swap
+    /// @param data Any data to be passed through to the callback
+    /// @return amount0 The delta of the balance of token0 of the pool, exact when negative, minimum when positive
+    /// @return amount1 The delta of the balance of token1 of the pool, exact when negative, minimum when positive
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
+
+    /// @notice Receive token0 and/or token1 and pay it back, plus a fee, in the callback
+    /// @dev The caller of this method receives a callback in the form of IUniswapV3FlashCallback#uniswapV3FlashCallback
+    /// @dev Can be used to donate underlying tokens pro-rata to currently in-range liquidity providers by calling
+    /// with 0 amount{0,1} and sending the donation amount(s) from the callback
+    /// @param recipient The address which will receive the token0 and token1 amounts
+    /// @param amount0 The amount of token0 to send
+    /// @param amount1 The amount of token1 to send
+    /// @param data Any data to be passed through to the callback
+    function flash(
+        address recipient,
+        uint256 amount0,
+        uint256 amount1,
+        bytes calldata data
+    ) external;
+
+    /// @notice Increase the maximum number of price and liquidity observations that this pool will store
+    /// @dev This method is no-op if the pool already has an observationCardinalityNext greater than or equal to
+    /// the input observationCardinalityNext.
+    /// @param observationCardinalityNext The desired minimum number of observations for the pool to store
+    function increaseObservationCardinalityNext(uint16 observationCardinalityNext) external;
 }
 
 
@@ -4063,14 +4024,14 @@ contract NonfungiblePositionManager is
             FullMath.mulDiv(
                 feeGrowthInside0LastX128 - position.feeGrowthInside0LastX128,
                 position.liquidity,
-                FixedPoint128.Q128
+                uint256(0x100000000000000000000000000000000)
             )
         );
         position.tokensOwed1 += uint128(
             FullMath.mulDiv(
                 feeGrowthInside1LastX128 - position.feeGrowthInside1LastX128,
                 position.liquidity,
-                FixedPoint128.Q128
+                uint256(0x100000000000000000000000000000000)
             )
         );
 
@@ -4111,7 +4072,7 @@ contract NonfungiblePositionManager is
                 FullMath.mulDiv(
                     feeGrowthInside0LastX128 - position.feeGrowthInside0LastX128,
                     positionLiquidity,
-                    FixedPoint128.Q128
+                    uint256(0x100000000000000000000000000000000)
                 )
             );
         position.tokensOwed1 +=
@@ -4120,7 +4081,7 @@ contract NonfungiblePositionManager is
                 FullMath.mulDiv(
                     feeGrowthInside1LastX128 - position.feeGrowthInside1LastX128,
                     positionLiquidity,
-                    FixedPoint128.Q128
+                    uint256(0x100000000000000000000000000000000)
                 )
             );
 
@@ -4161,14 +4122,14 @@ contract NonfungiblePositionManager is
                 FullMath.mulDiv(
                     feeGrowthInside0LastX128 - position.feeGrowthInside0LastX128,
                     position.liquidity,
-                    FixedPoint128.Q128
+                    uint256(0x100000000000000000000000000000000)
                 )
             );
             tokensOwed1 += uint128(
                 FullMath.mulDiv(
                     feeGrowthInside1LastX128 - position.feeGrowthInside1LastX128,
                     position.liquidity,
-                    FixedPoint128.Q128
+                    uint256(0x100000000000000000000000000000000)
                 )
             );
 

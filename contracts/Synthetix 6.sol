@@ -681,7 +681,7 @@ contract TokenState is Owned, State {
 
 
 // https://docs.synthetix.io/contracts/source/contracts/externstatetoken
-abstract contract ExternStateToken is Owned, Proxyable {
+abstract contract ExternStateToken is Owned, Proxyable, IERC20 {
     using SafeMath for uint;
     using SafeDecimalMath for uint;
 
@@ -691,10 +691,10 @@ abstract contract ExternStateToken is Owned, Proxyable {
     TokenState public tokenState;
 
     /* Other ERC20 fields. */
-    string public name;
-    string public symbol;
-    uint public totalSupply;
-    uint8 public decimals;
+    string public override name;
+    string public override symbol;
+    uint public override totalSupply;
+    uint8 public override decimals;
 
     constructor(
         address payable _proxy,
@@ -720,14 +720,14 @@ abstract contract ExternStateToken is Owned, Proxyable {
      * @param owner The party authorising spending of their funds.
      * @param spender The party spending tokenOwner's funds.
      */
-    function allowance(address owner, address spender) public view returns (uint) {
+    function allowance(address owner, address spender) public view override returns (uint) {
         return tokenState.allowance(owner, spender);
     }
 
     /**
      * @notice Returns the ERC20 token balance of a given account.
      */
-    function balanceOf(address account) external view returns (uint) {
+    function balanceOf(address account) external view override returns (uint) {
         return tokenState.balanceOf(account);
     }
 
@@ -791,7 +791,7 @@ abstract contract ExternStateToken is Owned, Proxyable {
     /**
      * @notice Approves spender to transfer on the message sender's behalf.
      */
-    function approve(address spender, uint value) public optionalProxy returns (bool) {
+    function approve(address spender, uint value) public override optionalProxy returns (bool) {
         address sender = messageSender;
 
         tokenState.setAllowance(sender, spender, value);
@@ -1494,7 +1494,7 @@ interface IRewardsDistribution {
 // Internal references
 
 
-abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISynthetix {
+abstract contract BaseSynthetix is ExternStateToken, MixinResolver, ISynthetix {
     // ========== STATE VARIABLES ==========
 
     // Available Synths which can be used with the system
@@ -1527,7 +1527,7 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
     // ========== VIEWS ==========
 
     // Note: use public visibility so that it can be invoked in a subclass
-    function resolverAddressesRequired() public view override returns (bytes32[] memory addresses) {
+    function resolverAddressesRequired() public view virtual override returns (bytes32[] memory addresses) {
         addresses = new bytes32[](5);
         addresses[0] = CONTRACT_SYNTHETIXSTATE;
         addresses[1] = CONTRACT_SYSTEMSTATUS;
@@ -1700,7 +1700,7 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         bytes32,
         uint,
         bytes32
-    ) external override returns (uint) {
+    ) external virtual override returns (uint) {
         _notImplemented();
     }
 
@@ -1709,7 +1709,7 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         bytes32,
         uint,
         bytes32
-    ) external override returns (uint) {
+    ) external virtual override returns (uint) {
         _notImplemented();
     }
 
@@ -1719,7 +1719,7 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         bytes32,
         address,
         bytes32
-    ) external override returns (uint) {
+    ) external virtual override returns (uint) {
         _notImplemented();
     }
 
@@ -1730,7 +1730,7 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         bytes32,
         address,
         bytes32
-    ) external override returns (uint) {
+    ) external virtual override returns (uint) {
         _notImplemented();
     }
 
@@ -1739,12 +1739,12 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         uint,
         bytes32,
         bytes32
-    ) external override returns (uint, IVirtualSynth) {
+    ) external virtual override returns (uint, IVirtualSynth) {
         _notImplemented();
     }
 
     function settle(bytes32)
-        external override
+        external override virtual
         returns (
             uint,
             uint,
@@ -1754,11 +1754,11 @@ abstract contract BaseSynthetix is IERC20, ExternStateToken, MixinResolver, ISyn
         _notImplemented();
     }
 
-    function mint() external override returns (bool) {
+    function mint() external override virtual returns (bool) {
         _notImplemented();
     }
 
-    function liquidateDelinquentAccount(address, uint) external override returns (bool) {
+    function liquidateDelinquentAccount(address, uint) external override virtual returns (bool) {
         _notImplemented();
     }
 
@@ -1978,7 +1978,7 @@ contract Synthetix is BaseSynthetix {
         bytes32 sourceCurrencyKey,
         uint sourceAmount,
         bytes32 destinationCurrencyKey
-    ) external exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
+    ) external override exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
         return exchanger().exchange(messageSender, sourceCurrencyKey, sourceAmount, destinationCurrencyKey, messageSender);
     }
 
@@ -1987,7 +1987,7 @@ contract Synthetix is BaseSynthetix {
         bytes32 sourceCurrencyKey,
         uint sourceAmount,
         bytes32 destinationCurrencyKey
-    ) external exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
+    ) external override exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
         return
             exchanger().exchangeOnBehalf(
                 exchangeForAddress,
@@ -2004,7 +2004,7 @@ contract Synthetix is BaseSynthetix {
         bytes32 destinationCurrencyKey,
         address originator,
         bytes32 trackingCode
-    ) external exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
+    ) external override exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
         return
             exchanger().exchangeWithTracking(
                 messageSender,
@@ -2024,7 +2024,7 @@ contract Synthetix is BaseSynthetix {
         bytes32 destinationCurrencyKey,
         address originator,
         bytes32 trackingCode
-    ) external exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
+    ) external override exchangeActive(sourceCurrencyKey, destinationCurrencyKey) optionalProxy returns (uint amountReceived) {
         return
             exchanger().exchangeOnBehalfWithTracking(
                 exchangeForAddress,
@@ -2044,6 +2044,7 @@ contract Synthetix is BaseSynthetix {
         bytes32 trackingCode
     )
         external
+        override
         exchangeActive(sourceCurrencyKey, destinationCurrencyKey)
         optionalProxy
         returns (uint amountReceived, IVirtualSynth vSynth)
@@ -2061,6 +2062,7 @@ contract Synthetix is BaseSynthetix {
 
     function settle(bytes32 currencyKey)
         external
+        override
         optionalProxy
         returns (
             uint reclaimed,
@@ -2071,7 +2073,7 @@ contract Synthetix is BaseSynthetix {
         return exchanger().settle(messageSender, currencyKey);
     }
 
-    function mint() external issuanceActive returns (bool) {
+    function mint() external override issuanceActive returns (bool) {
         require(address(rewardsDistribution()) != address(0), "RewardsDistribution not set");
 
         ISupplySchedule _supplySchedule = supplySchedule();
@@ -2110,6 +2112,7 @@ contract Synthetix is BaseSynthetix {
 
     function liquidateDelinquentAccount(address account, uint susdAmount)
         external
+        override
         systemActive
         optionalProxy
         returns (bool)

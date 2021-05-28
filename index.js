@@ -12,8 +12,18 @@
   }, {})
 
   const fileNames = await fs.readdir('contracts')
-  const sols = await Promise.all(fileNames.map(fileName => fs.readFile(`contracts/${fileName}`, 'utf-8')))
-  const solNameVersionList = fileNames.flatMap((fileName, i) => {
+
+  const libsFileNames = fileNames.filter(fileName => fileName.includes('.json'))
+  const libs = await Promise.all(libsFileNames.map(
+    fileName => fs.readFile(`contracts/${fileName}`, 'utf-8').then(txt => JSON.parse(txt))))
+  const libsByName = libsFileNames.map(fileName => fileName.replace('.json', '')).reduce((libsByName, name, i) => {
+    libsByName[name] = libs[i]
+    return libsByName
+  }, {})
+
+  const contractFileNames = fileNames.filter(fileName => fileName.includes('.sol'))
+  const sols = await Promise.all(contractFileNames.map(fileName => fs.readFile(`contracts/${fileName}`, 'utf-8')))
+  const solNameVersionList = contractFileNames.flatMap((fileName, i) => {
     const sol = sols[i]
     const [, name, vStr] = fileName.match(/([^ ]+)((?: \d)+)?\.sol$/)
     return vStr.slice(1).split(' ').map(v => ({ name, sol, v }))
@@ -22,12 +32,13 @@
   const solSolcProduct = solNameVersionList.map(({ name, sol, v }) => {
     const version = Object.keys(solcsByVersion).find(k => k.startsWith(`0.${v}`))
     const solc = solcsByVersion[version]
-    return { name, sol, version, solc }
+    const libs = libsByName[name] || {}
+    return { name, sol, version, solc, libs }
   })
 
   const deployedFiles = await fs.readdir('deployed');
 
-  const done = solSolcProduct.map(async ({ name, sol, version, solc }) => {
+  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs }) => {
     const fileName = `${name} - ${version}.hex`
 
     if (deployedFiles.includes(fileName))
@@ -45,6 +56,9 @@
           '*': {
             '*': ['*']
           }
+        },
+        libraries: {
+          [name]: libs
         }
       }
     }

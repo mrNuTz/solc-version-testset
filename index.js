@@ -29,19 +29,21 @@
     return vStr.slice(1).split(' ').map(v => ({ name, sol, v }))
   }, {})
 
-  const solSolcProduct = solNameVersionList.map(({ name, sol, v }) => {
-    const version = Object.keys(solcsByVersion).find(k => k.startsWith(`0.${v}`))
-    const solc = solcsByVersion[version]
-    const libs = libsByName[name] || {}
-    return { name, sol, version, solc, libs }
-  })
+  const solSolcProduct = solNameVersionList
+    .map(({ name, sol, v }) => {
+      const version = Object.keys(solcsByVersion).find(k => k.startsWith(`0.${v}`))
+      const solc = solcsByVersion[version]
+      const libs = libsByName[name] || {}
+      return { name, sol, version, solc, libs }
+    })
+    .flatMap(el => [{ ...el, runs: 0 },{ ...el, runs: 1000000 }])
 
   const deployedFiles = await fs.readdir('deployed');
 
-  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs }) => {
-    const fileName = `${name} - ${version}.hex`
+  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs, runs }) => {
+    const fileName = `${name} - ${runs} ${version}`
 
-    if (deployedFiles.includes(fileName))
+    if (deployedFiles.includes(fileName + '.hex'))
       return
 
     const input = {
@@ -62,6 +64,9 @@
         }
       }
     }
+    if (runs) {
+      input.settings.optimizer = { enabled: true, runs }
+    }
 
     const output = JSON.parse(solc.compile(JSON.stringify(input)))
     if (!output.contracts) {
@@ -76,10 +81,10 @@
     console.log('** SUCC', fileName, '**')
     console.log('')
     return Promise.all([
-      fs.writeFile(`deployed/${fileName}`, deployed, 'utf-8'),
-      fs.writeFile(`deployed/opcodes/${name} - ${version}.asm`, opcodes, 'utf-8'),
-      fs.writeFile(`assembly/${name} - ${version}.asm`, assembly, 'utf-8'),
-      //fs.writeFile(`output/${name} - ${version}.json`, JSON.stringify(output, null, 2), 'utf-8'),
+      fs.writeFile(`deployed/${fileName}.hex`, deployed, 'utf-8'),
+      fs.writeFile(`deployed/opcodes/${fileName}.asm`, opcodes, 'utf-8'),
+      fs.writeFile(`assembly/${fileName}.asm`, assembly, 'utf-8'),
+      //fs.writeFile(`output/${fileName}.json`, JSON.stringify(output, null, 2), 'utf-8'),
     ])
   })
   await Promise.all(done)

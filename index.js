@@ -36,12 +36,16 @@
       const libs = libsByName[name] || {}
       return { name, sol, version, solc, libs }
     })
-    .flatMap(el => [{ ...el, runs: 0 },{ ...el, runs: 1000000 }])
+    .flatMap(el => [
+      { ...el, optimizer: { enabled: false } },
+      { ...el, optimizer: { enabled: true, runs: 1 } },
+      { ...el, optimizer: { enabled: true, runs: 999999 } }
+    ])
 
   const deployedFiles = await fs.readdir('deployed');
 
-  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs, runs }) => {
-    const fileName = `${name} - ${runs} ${version}`
+  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs, optimizer }) => {
+    const fileName = `${name} - ${!optimizer.enabled ? 'no' : optimizer.runs} ${version}`
 
     if (deployedFiles.includes(fileName + '.hex'))
       return
@@ -61,11 +65,9 @@
         },
         libraries: {
           [name]: libs
-        }
+        },
+        optimizer
       }
-    }
-    if (runs) {
-      input.settings.optimizer = { enabled: true, runs }
     }
 
     const output = JSON.parse(solc.compile(JSON.stringify(input)))

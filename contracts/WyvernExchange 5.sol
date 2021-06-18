@@ -2,8 +2,6 @@
  *Submitted for verification at Etherscan.io on 2018-06-12
 */
 
-pragma solidity ^0.4.13;
-
 library SafeMath {
 
   /**
@@ -226,7 +224,7 @@ library ArrayUtils {
      * @param source Byte array to write
      * @return End memory index
      */
-    function unsafeWriteBytes(uint index, bytes source)
+    function unsafeWriteBytes(uint index, bytes memory source)
         internal
         pure
         returns (uint)
@@ -336,16 +334,16 @@ contract TokenRecipient {
      * @param token Address of token
      * @param extraData Additional data to log
      */
-    function receiveApproval(address from, uint256 value, address token, bytes extraData) public {
+    function receiveApproval(address from, uint256 value, address token, bytes memory extraData) public {
         ERC20 t = ERC20(token);
-        require(t.transferFrom(from, adderss(this), value));
+        require(t.transferFrom(from, address(this), value));
         emit ReceivedTokens(from, value, token, extraData);
     }
 
     /**
      * @dev Receive Ether and generate a log event
      */
-    function () payable public {
+    function () payable external {
         emit ReceivedEther(msg.sender, msg.value);
     }
 }
@@ -374,7 +372,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
     uint public minimumTakerProtocolFee = 0;
 
     /* Recipient of protocol fees. */
-    address public protocolFeeRecipient;
+    address payable public protocolFeeRecipient;
 
     /* Fee method: protocol fee or split fee. */
     enum FeeMethod { ProtocolFee, SplitFee }
@@ -397,7 +395,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         /* Exchange address, intended as a versioning mechanism. */
         address exchange;
         /* Order maker address. */
-        address maker;
+        address payable maker;
         /* Order taker address, if specified. */
         address taker;
         /* Maker relayer fee of the order, unused for taker order. */
@@ -409,7 +407,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         /* Taker protocol fee of the order, or maximum taker fee for a taker order. */
         uint takerProtocolFee;
         /* Order fee recipient or zero address for taker order. */
-        address feeRecipient;
+        address payable feeRecipient;
         /* Fee method (protocol token or split fee). */
         FeeMethod feeMethod;
         /* Side (buy/sell). */
@@ -421,7 +419,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         /* HowToCall. */
         AuthenticatedProxy.HowToCall howToCall;
         /* Calldata. */
-        bytes calldata;
+        bytes _calldata;
         /* Calldata replacement pattern, or an empty byte array for no replacement. */
         bytes replacementPattern;
         /* Static call target, zero-address for no static call. */
@@ -429,7 +427,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         /* Static call extra data. */
         bytes staticExtradata;
         /* Token used to pay for the order, or the zero-address as a sentinel value for Ether. */
-        address paymentToken;
+        address payable paymentToken;
         /* Base price of the order (in paymentTokens). */
         uint basePrice;
         /* Auction extra parameter - minimum bid increment for English auctions, starting/ending price difference. */
@@ -442,8 +440,8 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         uint salt;
     }
 
-    event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint makerRelayerFee, uint takerRelayerFee, uint makerProtocolFee, uint takerProtocolFee, address indexed feeRecipient, FeeMethod feeMethod, SaleKindInterface.Side side, SaleKindInterface.SaleKind saleKind, address target);
-    event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.HowToCall howToCall, bytes calldata, bytes replacementPattern, address staticTarget, bytes staticExtradata, address paymentToken, uint basePrice, uint extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
+    event OrderApprovedPartOne    (bytes32 indexed hash, address exchange, address indexed maker, address taker, uint makerRelayerFee, uint takerRelayerFee, uint makerProtocolFee, uint takerProtocolFee, address payable indexed feeRecipient, FeeMethod feeMethod, SaleKindInterface.Side side, SaleKindInterface.SaleKind saleKind, address target);
+    event OrderApprovedPartTwo    (bytes32 indexed hash, AuthenticatedProxy.HowToCall howToCall, bytes _calldata, bytes replacementPattern, address staticTarget, bytes staticExtradata, address payable paymentToken, uint basePrice, uint extra, uint listingTime, uint expirationTime, uint salt, bool orderbookInclusionDesired);
     event OrderCancelled          (bytes32 indexed hash);
     event OrdersMatched           (bytes32 buyHash, bytes32 sellHash, address indexed maker, address indexed taker, uint price, bytes32 indexed metadata);
 
@@ -473,7 +471,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
      * @dev Change the protocol fee recipient (owner only)
      * @param newProtocolFeeRecipient New protocol fee recipient address
      */
-    function changeProtocolFeeRecipient(address newProtocolFeeRecipient)
+    function changeProtocolFeeRecipient(address payable newProtocolFeeRecipient)
         public
         onlyOwner
     {
@@ -504,28 +502,28 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
     function chargeProtocolFee(address from, address to, uint amount)
         internal
     {
-        transferTokens(exchangeToken, from, to, amount);
+        transferTokens(address(exchangeToken), from, to, amount);
     }
 
     /**
      * @dev Execute a STATICCALL (introduced with Ethereum Metropolis, non-state-modifying external call)
      * @param target Contract to call
-     * @param calldata Calldata (appended to extradata)
+     * @param _calldata Calldata (appended to extradata)
      * @param extradata Base data for STATICCALL (probably function selector and argument encoding)
      * @return The result of the call (success or failure)
      */
-    function staticCall(address target, bytes memory calldata, bytes memory extradata)
+    function staticCall(address target, bytes memory _calldata, bytes memory extradata)
         public
         view
         returns (bool result)
     {
-        bytes memory combined = new bytes(calldata.length + extradata.length);
+        bytes memory combined = new bytes(_calldata.length + extradata.length);
         uint index;
         assembly {
             index := add(combined, 0x20)
         }
         index = ArrayUtils.unsafeWriteBytes(index, extradata);
-        ArrayUtils.unsafeWriteBytes(index, calldata);
+        ArrayUtils.unsafeWriteBytes(index, _calldata);
         assembly {
             result := staticcall(gas, target, add(combined, 0x20), mload(combined), mload(0x40), 0)
         }
@@ -543,7 +541,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         pure
         returns (uint)
     {
-        return ((0x14 * 7) + (0x20 * 9) + 4 + order.calldata.length + order.replacementPattern.length + order.staticExtradata.length);
+        return ((0x14 * 7) + (0x20 * 9) + 4 + order._calldata.length + order.replacementPattern.length + order.staticExtradata.length);
     }
 
     /**
@@ -576,7 +574,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.saleKind));
         index = ArrayUtils.unsafeWriteAddress(index, order.target);
         index = ArrayUtils.unsafeWriteUint8(index, uint8(order.howToCall));
-        index = ArrayUtils.unsafeWriteBytes(index, order.calldata);
+        index = ArrayUtils.unsafeWriteBytes(index, order._calldata);
         index = ArrayUtils.unsafeWriteBytes(index, order.replacementPattern);
         index = ArrayUtils.unsafeWriteAddress(index, order.staticTarget);
         index = ArrayUtils.unsafeWriteBytes(index, order.staticExtradata);
@@ -602,7 +600,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         pure
         returns (bytes32)
     {
-        return keccak256("\x19Ethereum Signed Message:\n32", hashOrder(order));
+        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hashOrder(order)));
     }
 
     /**
@@ -713,7 +711,7 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
             emit OrderApprovedPartOne(hash, order.exchange, order.maker, order.taker, order.makerRelayerFee, order.takerRelayerFee, order.makerProtocolFee, order.takerProtocolFee, order.feeRecipient, order.feeMethod, order.side, order.saleKind, order.target);
         }
         {
-            emit OrderApprovedPartTwo(hash, order.howToCall, order.calldata, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
+            emit OrderApprovedPartTwo(hash, order.howToCall, order._calldata, order.replacementPattern, order.staticTarget, order.staticExtradata, order.paymentToken, order.basePrice, order.extra, order.listingTime, order.expirationTime, order.salt, orderbookInclusionDesired);
         }
     }
 
@@ -881,22 +879,22 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
                 require(buy.takerProtocolFee <= sell.takerProtocolFee);
 
                 if (buy.makerRelayerFee > 0) {
-                    makerRelayerFee = SafeMath.div(SafeMath.mul(buy.makerRelayerFee, price), INVERSE_BASIS_POINT);
+                    uint makerRelayerFee = SafeMath.div(SafeMath.mul(buy.makerRelayerFee, price), INVERSE_BASIS_POINT);
                     transferTokens(sell.paymentToken, buy.maker, buy.feeRecipient, makerRelayerFee);
                 }
 
                 if (buy.takerRelayerFee > 0) {
-                    takerRelayerFee = SafeMath.div(SafeMath.mul(buy.takerRelayerFee, price), INVERSE_BASIS_POINT);
+                    uint takerRelayerFee = SafeMath.div(SafeMath.mul(buy.takerRelayerFee, price), INVERSE_BASIS_POINT);
                     transferTokens(sell.paymentToken, sell.maker, buy.feeRecipient, takerRelayerFee);
                 }
 
                 if (buy.makerProtocolFee > 0) {
-                    makerProtocolFee = SafeMath.div(SafeMath.mul(buy.makerProtocolFee, price), INVERSE_BASIS_POINT);
+                    uint makerProtocolFee = SafeMath.div(SafeMath.mul(buy.makerProtocolFee, price), INVERSE_BASIS_POINT);
                     transferTokens(sell.paymentToken, buy.maker, protocolFeeRecipient, makerProtocolFee);
                 }
 
                 if (buy.takerProtocolFee > 0) {
-                    takerProtocolFee = SafeMath.div(SafeMath.mul(buy.takerProtocolFee, price), INVERSE_BASIS_POINT);
+                    uint takerProtocolFee = SafeMath.div(SafeMath.mul(buy.takerProtocolFee, price), INVERSE_BASIS_POINT);
                     transferTokens(sell.paymentToken, sell.maker, protocolFeeRecipient, takerProtocolFee);
                 }
 
@@ -1001,24 +999,24 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
 
         /* Must match calldata after replacement, if specified. */
         if (buy.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(buy.calldata, sell.calldata, buy.replacementPattern);
+          ArrayUtils.guardedArrayReplace(buy._calldata, sell._calldata, buy.replacementPattern);
         }
         if (sell.replacementPattern.length > 0) {
-          ArrayUtils.guardedArrayReplace(sell.calldata, buy.calldata, sell.replacementPattern);
+          ArrayUtils.guardedArrayReplace(sell._calldata, buy._calldata, sell.replacementPattern);
         }
-        require(ArrayUtils.arrayEq(buy.calldata, sell.calldata));
+        require(ArrayUtils.arrayEq(buy._calldata, sell._calldata));
 
         /* Retrieve delegateProxy contract. */
         OwnableDelegateProxy delegateProxy = registry.proxies(sell.maker);
 
         /* Proxy must exist. */
-        require(delegateProxy != address(0));
+        require(address(delegateProxy) != address(0));
 
         /* Assert implementation. */
         require(delegateProxy.implementation() == registry.delegateProxyImplementation());
 
         /* Access the passthrough AuthenticatedProxy. */
-        AuthenticatedProxy proxy = AuthenticatedProxy(delegateProxy);
+        AuthenticatedProxy proxy = AuthenticatedProxy(address(delegateProxy));
 
         /* EFFECTS */
 
@@ -1036,18 +1034,18 @@ contract ExchangeCore is ReentrancyGuarded, Ownable {
         uint price = executeFundsTransfer(buy, sell);
 
         /* Execute specified call through proxy. */
-        require(proxy.proxy(sell.target, sell.howToCall, sell.calldata));
+        require(proxy.proxy(sell.target, sell.howToCall, sell._calldata));
 
         /* Static calls are intentionally done after the effectful call so they can check resulting state. */
 
         /* Handle buy-side static call if specified. */
         if (buy.staticTarget != address(0)) {
-            require(staticCall(buy.staticTarget, sell.calldata, buy.staticExtradata));
+            require(staticCall(buy.staticTarget, sell._calldata, buy.staticExtradata));
         }
 
         /* Handle sell-side static call if specified. */
         if (sell.staticTarget != address(0)) {
-            require(staticCall(sell.staticTarget, sell.calldata, sell.staticExtradata));
+            require(staticCall(sell.staticTarget, sell._calldata, sell.staticExtradata));
         }
 
         /* Log match event. */
@@ -1061,10 +1059,10 @@ contract Exchange is ExchangeCore {
     /**
      * @dev Call guardedArrayReplace - library function exposed for testing.
      */
-    function guardedArrayReplace(bytes array, bytes desired, bytes mask)
+    function guardedArrayReplace(bytes memory array, bytes memory desired, bytes memory mask)
         public
         pure
-        returns (bytes)
+        returns (bytes memory)
     {
         ArrayUtils.guardedArrayReplace(array, desired, mask);
         return array;
@@ -1076,10 +1074,10 @@ contract Exchange is ExchangeCore {
      * @param arrToCopy Array to copy
      * @return byte array
      */
-    function testCopy(bytes arrToCopy)
+    function testCopy(bytes memory arrToCopy)
         public
         pure
-        returns (bytes)
+        returns (bytes memory)
     {
         bytes memory arr = new bytes(arrToCopy.length);
         uint index;
@@ -1099,7 +1097,7 @@ contract Exchange is ExchangeCore {
     function testCopyAddress(address addr)
         public
         pure
-        returns (bytes)
+        returns (bytes memory)
     {
         bytes memory arr = new bytes(0x14);
         uint index;
@@ -1125,21 +1123,21 @@ contract Exchange is ExchangeCore {
      * @dev Call hashOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function hashOrder_(
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata)
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata)
         public
         pure
         returns (bytes32)
     {
         return hashOrder(
-          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8])
+          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8])
         );
     }
 
@@ -1147,21 +1145,21 @@ contract Exchange is ExchangeCore {
      * @dev Call hashToSign - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function hashToSign_(
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata)
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata)
         public
         pure
         returns (bytes32)
     {
         return hashToSign(
-          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8])
+          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8])
         );
     }
 
@@ -1169,20 +1167,20 @@ contract Exchange is ExchangeCore {
      * @dev Call validateOrderParameters - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function validateOrderParameters_ (
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata)
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata)
         view
         public
         returns (bool)
     {
-        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]);
+        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]);
         return validateOrderParameters(
           order
         );
@@ -1192,15 +1190,15 @@ contract Exchange is ExchangeCore {
      * @dev Call validateOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function validateOrder_ (
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata,
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata,
         uint8 v,
         bytes32 r,
         bytes32 s)
@@ -1208,7 +1206,7 @@ contract Exchange is ExchangeCore {
         public
         returns (bool)
     {
-        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]);
+        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]);
         return validateOrder(
           hashToSign(order),
           order,
@@ -1220,19 +1218,19 @@ contract Exchange is ExchangeCore {
      * @dev Call approveOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function approveOrder_ (
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata,
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata,
         bool orderbookInclusionDesired)
         public
     {
-        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]);
+        Order memory order = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]);
         return approveOrder(order, orderbookInclusionDesired);
     }
 
@@ -1240,15 +1238,15 @@ contract Exchange is ExchangeCore {
      * @dev Call cancelOrder - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function cancelOrder_(
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata,
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata,
         uint8 v,
         bytes32 r,
         bytes32 s)
@@ -1256,7 +1254,7 @@ contract Exchange is ExchangeCore {
     {
 
         return cancelOrder(
-          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]),
+          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]),
           Sig(v, r, s)
         );
     }
@@ -1265,21 +1263,21 @@ contract Exchange is ExchangeCore {
      * @dev Call calculateCurrentPrice - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function calculateCurrentPrice_(
-        address[7] addrs,
-        uint[9] uints,
+        address payable[7] memory addrs,
+        uint[9] memory uints,
         FeeMethod feeMethod,
         SaleKindInterface.Side side,
         SaleKindInterface.SaleKind saleKind,
         AuthenticatedProxy.HowToCall howToCall,
-        bytes calldata,
-        bytes replacementPattern,
-        bytes staticExtradata)
+        bytes memory _calldata,
+        bytes memory replacementPattern,
+        bytes memory staticExtradata)
         public
         view
         returns (uint)
     {
         return calculateCurrentPrice(
-          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, calldata, replacementPattern, addrs[5], staticExtradata, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8])
+          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], feeMethod, side, saleKind, addrs[4], howToCall, _calldata, replacementPattern, addrs[5], staticExtradata, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8])
         );
     }
 
@@ -1287,21 +1285,21 @@ contract Exchange is ExchangeCore {
      * @dev Call ordersCanMatch - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function ordersCanMatch_(
-        address[14] addrs,
-        uint[18] uints,
-        uint8[8] feeMethodsSidesKindsHowToCalls,
-        bytes calldataBuy,
-        bytes calldataSell,
-        bytes replacementPatternBuy,
-        bytes replacementPatternSell,
-        bytes staticExtradataBuy,
-        bytes staticExtradataSell)
+        address payable[14] memory addrs,
+        uint[18] memory uints,
+        uint8[8] memory feeMethodsSidesKindsHowToCalls,
+        bytes memory calldataBuy,
+        bytes memory calldataSell,
+        bytes memory replacementPatternBuy,
+        bytes memory replacementPatternSell,
+        bytes memory staticExtradataBuy,
+        bytes memory staticExtradataSell)
         public
         view
         returns (bool)
     {
-        Order memory buy = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]);
-        Order memory sell = Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, ERC20(addrs[13]), uints[13], uints[14], uints[15], uints[16], uints[17]);
+        Order memory buy = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]);
+        Order memory sell = Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, addrs[13], uints[13], uints[14], uints[15], uints[16], uints[17]);
         return ordersCanMatch(
           buy,
           sell
@@ -1316,7 +1314,7 @@ contract Exchange is ExchangeCore {
      * @param sellReplacementPattern Sell-side order calldata replacement mask
      * @return Whether the orders' calldata can be matched
      */
-    function orderCalldataCanMatch(bytes buyCalldata, bytes buyReplacementPattern, bytes sellCalldata, bytes sellReplacementPattern)
+    function orderCalldataCanMatch(bytes memory buyCalldata, bytes memory buyReplacementPattern, bytes memory sellCalldata, bytes memory sellReplacementPattern)
         public
         pure
         returns (bool)
@@ -1334,21 +1332,21 @@ contract Exchange is ExchangeCore {
      * @dev Call calculateMatchPrice - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function calculateMatchPrice_(
-        address[14] addrs,
-        uint[18] uints,
-        uint8[8] feeMethodsSidesKindsHowToCalls,
-        bytes calldataBuy,
-        bytes calldataSell,
-        bytes replacementPatternBuy,
-        bytes replacementPatternSell,
-        bytes staticExtradataBuy,
-        bytes staticExtradataSell)
+        address payable[14] memory addrs,
+        uint[18] memory uints,
+        uint8[8] memory feeMethodsSidesKindsHowToCalls,
+        bytes memory calldataBuy,
+        bytes memory calldataSell,
+        bytes memory replacementPatternBuy,
+        bytes memory replacementPatternSell,
+        bytes memory staticExtradataBuy,
+        bytes memory staticExtradataSell)
         public
         view
         returns (uint)
     {
-        Order memory buy = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]);
-        Order memory sell = Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, ERC20(addrs[13]), uints[13], uints[14], uints[15], uints[16], uints[17]);
+        Order memory buy = Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]);
+        Order memory sell = Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, addrs[13], uints[13], uints[14], uints[15], uints[16], uints[17]);
         return calculateMatchPrice(
           buy,
           sell
@@ -1359,25 +1357,25 @@ contract Exchange is ExchangeCore {
      * @dev Call atomicMatch - Solidity ABI encoding limitation workaround, hopefully temporary.
      */
     function atomicMatch_(
-        address[14] addrs,
-        uint[18] uints,
-        uint8[8] feeMethodsSidesKindsHowToCalls,
-        bytes calldataBuy,
-        bytes calldataSell,
-        bytes replacementPatternBuy,
-        bytes replacementPatternSell,
-        bytes staticExtradataBuy,
-        bytes staticExtradataSell,
-        uint8[2] vs,
-        bytes32[5] rssMetadata)
+        address payable[14] memory addrs,
+        uint[18] memory uints,
+        uint8[8] memory feeMethodsSidesKindsHowToCalls,
+        bytes memory calldataBuy,
+        bytes memory calldataSell,
+        bytes memory replacementPatternBuy,
+        bytes memory replacementPatternSell,
+        bytes memory staticExtradataBuy,
+        bytes memory staticExtradataSell,
+        uint8[2] memory vs,
+        bytes32[5] memory rssMetadata)
         public
         payable
     {
 
         return atomicMatch(
-          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, ERC20(addrs[6]), uints[4], uints[5], uints[6], uints[7], uints[8]),
+          Order(addrs[0], addrs[1], addrs[2], uints[0], uints[1], uints[2], uints[3], addrs[3], FeeMethod(feeMethodsSidesKindsHowToCalls[0]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[1]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[2]), addrs[4], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[3]), calldataBuy, replacementPatternBuy, addrs[5], staticExtradataBuy, addrs[6], uints[4], uints[5], uints[6], uints[7], uints[8]),
           Sig(vs[0], rssMetadata[0], rssMetadata[1]),
-          Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, ERC20(addrs[13]), uints[13], uints[14], uints[15], uints[16], uints[17]),
+          Order(addrs[7], addrs[8], addrs[9], uints[9], uints[10], uints[11], uints[12], addrs[10], FeeMethod(feeMethodsSidesKindsHowToCalls[4]), SaleKindInterface.Side(feeMethodsSidesKindsHowToCalls[5]), SaleKindInterface.SaleKind(feeMethodsSidesKindsHowToCalls[6]), addrs[11], AuthenticatedProxy.HowToCall(feeMethodsSidesKindsHowToCalls[7]), calldataSell, replacementPatternSell, addrs[12], staticExtradataSell, addrs[13], uints[13], uints[14], uints[15], uints[16], uints[17]),
           Sig(vs[1], rssMetadata[2], rssMetadata[3]),
           rssMetadata[4]
         );
@@ -1398,7 +1396,7 @@ contract WyvernExchange is Exchange {
      * @param registryAddress Address of the registry instance which this Exchange instance will use
      * @param tokenAddress Address of the token used for protocol fees
      */
-    constructor (ProxyRegistry registryAddress, TokenTransferProxy tokenTransferProxyAddress, ERC20 tokenAddress, address protocolFeeAddress) public {
+    constructor (ProxyRegistry registryAddress, TokenTransferProxy tokenTransferProxyAddress, ERC20 tokenAddress, address payable protocolFeeAddress) public {
         registry = registryAddress;
         tokenTransferProxy = tokenTransferProxyAddress;
         exchangeToken = tokenAddress;
@@ -1555,7 +1553,7 @@ contract ProxyRegistry is Ownable {
         public
         returns (OwnableDelegateProxy proxy)
     {
-        require(proxies[msg.sender] == address(0));
+        require(address(proxies[msg.sender]) == address(0));
         proxy = new OwnableDelegateProxy(msg.sender, delegateProxyImplementation, abi.encodeWithSignature("initialize(address,address)", msg.sender, address(this)));
         proxies[msg.sender] = proxy;
         return proxy;
@@ -1682,18 +1680,18 @@ contract AuthenticatedProxy is TokenRecipient, OwnedUpgradeabilityStorage {
      * @dev Can be called by the user, or by a contract authorized by the registry as long as the user has not revoked access
      * @param dest Address to which the call will be sent
      * @param howToCall Which kind of call to make
-     * @param calldata Calldata to send
+     * @param _calldata Calldata to send
      * @return Result of the call (success or failure)
      */
-    function proxy(address dest, HowToCall howToCall, bytes calldata)
+    function proxy(address dest, HowToCall howToCall, bytes memory _calldata)
         public
         returns (bool result)
     {
         require(msg.sender == user || (!revoked && registry.contracts(msg.sender)));
         if (howToCall == HowToCall.Call) {
-            result = dest.call(calldata);
+            (result, ) = dest.call(_calldata);
         } else if (howToCall == HowToCall.DelegateCall) {
-            result = dest.delegatecall(calldata);
+            (result, ) = dest.delegatecall(_calldata);
         }
         return result;
     }
@@ -1704,12 +1702,12 @@ contract AuthenticatedProxy is TokenRecipient, OwnedUpgradeabilityStorage {
      * @dev Same functionality as `proxy`, just asserts the return value
      * @param dest Address to which the call will be sent
      * @param howToCall What kind of call to make
-     * @param calldata Calldata to send
+     * @param _calldata Calldata to send
      */
-    function proxyAssert(address dest, HowToCall howToCall, bytes calldata)
+    function proxyAssert(address dest, HowToCall howToCall, bytes memory _calldata)
         public
     {
-        require(proxy(dest, howToCall, calldata));
+        require(proxy(dest, howToCall, _calldata));
     }
 
 }
@@ -1732,7 +1730,7 @@ contract Proxy {
   * @dev Fallback function allowing to perform a delegatecall to the given implementation.
   * This function will return whatever the implementation call returns
   */
-  function () payable public {
+  function () payable external {
     address _impl = implementation();
     require(_impl != address(0));
 
@@ -1815,20 +1813,22 @@ contract OwnedUpgradeabilityProxy is Proxy, OwnedUpgradeabilityStorage {
    * @param data represents the msg.data to bet sent in the low level call. This parameter may include the function
    * signature of the implementation to be called with the needed payload
    */
-  function upgradeToAndCall(address implementation, bytes data) payable public onlyProxyOwner {
+  function upgradeToAndCall(address implementation, bytes memory data) payable public onlyProxyOwner {
     upgradeTo(implementation);
-    require(address(this).delegatecall(data));
+    (bool succ, ) = address(this).delegatecall(data);
+    require(succ);
   }
 }
 
 contract OwnableDelegateProxy is OwnedUpgradeabilityProxy {
 
-    constructor(address owner, address initialImplementation, bytes calldata)
+    constructor(address owner, address initialImplementation, bytes memory _calldata)
         public
     {
         setUpgradeabilityOwner(owner);
         _upgradeTo(initialImplementation);
-        require(initialImplementation.delegatecall(calldata));
+        (bool succ, ) = initialImplementation.delegatecall(_calldata);
+        require(succ);
     }
 
 }

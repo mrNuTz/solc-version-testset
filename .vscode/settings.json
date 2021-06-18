@@ -1,6 +1,22 @@
 {
   "cSpell.words": [
+    "CALLDATALOAD",
+    "CALLDATASIZE",
+    "CALLVALUE",
+    "CODECOPY",
+    "ISZERO",
+    "JUMPDEST",
+    "JUMPI",
+    "KECCAK",
+    "MLOAD",
+    "MSTORE",
+    "RETURNDATACOPY",
+    "RETURNDATASIZE",
+    "SLOAD",
+    "SSTORE",
+    "STATICCALL",
     "solcs",
+    "sourcecopyarea",
     "succ"
   ],
   "solidity.defaultCompiler": "localNodeModule"

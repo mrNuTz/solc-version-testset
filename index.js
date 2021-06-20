@@ -57,7 +57,7 @@
   const deployedFiles = await fs.readdir('deployed');
 
   const done = solSolcProduct.map(async ({ name, sol, v, version, solc, libs, optimizer, abi }) => {
-    const fileName = `${name} - v${version} abi${abi || (v >= 8 ? 2 : 1)} o${optimizer.enabled ? 1 : 0} runs${optimizer.runs}`
+    const fileName = `${name} - v${version} abi${abi} o${optimizer.enabled ? 1 : 0} runs${optimizer.runs}`
 
     if (deployedFiles.includes(fileName + '.hex'))
       return
@@ -88,7 +88,7 @@
     }
 
     const output = JSON.parse(solc.compile(JSON.stringify(input)))
-    if (output.errors.some(({ severity }) => severity === 'error')) {
+    if (output.errors && output.errors.some(({ severity }) => severity === 'error')) {
       console.log('** FAIL', fileName, '**')
       for (err of output.errors.filter(({ severity }) => severity === 'error').slice(0,3))
         console.log(err.formattedMessage)

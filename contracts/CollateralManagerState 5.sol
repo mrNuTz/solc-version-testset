@@ -418,7 +418,6 @@ library SafeDecimalMath {
 }
 
 
-pragma experimental ABIEncoderV2;
 
 // Inheritance
 

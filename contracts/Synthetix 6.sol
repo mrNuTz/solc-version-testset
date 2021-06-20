@@ -1822,7 +1822,6 @@ interface IRewardEscrow {
 }
 
 
-pragma experimental ABIEncoderV2;
 
 
 library VestingEntries {

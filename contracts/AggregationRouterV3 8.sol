@@ -1049,7 +1049,6 @@ contract UnoswapRouter is Permitable {
 
 // File contracts/AggregationRouterV3.sol
 
-pragma experimental ABIEncoderV2;
 
 contract AggregationRouterV3 is Ownable, UnoswapRouter {
     using SafeMath for uint256;

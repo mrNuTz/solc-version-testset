@@ -982,7 +982,6 @@ abstract contract State is Owned {
 }
 
 
-pragma experimental ABIEncoderV2;
 
 // Inheritance
 

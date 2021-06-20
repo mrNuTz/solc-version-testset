@@ -1,4 +1,3 @@
-pragma abicoder v2;
 
 /// @title Interface for permit
 /// @notice Interface used by DAI/CHAI for permit

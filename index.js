@@ -11,6 +11,14 @@
     return solcsByVersion
   }, {})
 
+  const metaByName = (await fs.readFile('meta.csv', 'utf-8'))
+    .split('\n').splice(1).filter(line => line)
+    .map(line => line.split(','))
+    .reduce((metaByName, [name, address, requiresAbiV2]) => {
+      metaByName[name] = { address, requiresAbiV2: requiresAbiV2 === '1' }
+      return metaByName
+    }, {})
+
   const fileNames = await fs.readdir('contracts')
 
   const libsFileNames = fileNames.filter(fileName => fileName.includes('.json'))
@@ -34,21 +42,30 @@
       const version = Object.keys(solcsByVersion).find(k => k.startsWith(`0.${v}`))
       const solc = solcsByVersion[version]
       const libs = libsByName[name] || {}
-      return { name, sol, version, solc, libs }
+      const { requiresAbiV2 } = metaByName[name]
+
+      return { name, sol, version, solc, libs, v, requiresAbiV2 }
     })
     .flatMap(el => [
-      { ...el, optimizer: { enabled: false } },
-      { ...el, optimizer: { enabled: true, runs: 1 } },
+      { ...el, optimizer: { enabled: false, runs: 200 } },
+      { ...el, optimizer: { enabled: true, runs: 0 } },
+      { ...el, optimizer: { enabled: true, runs: 200 } },
       { ...el, optimizer: { enabled: true, runs: 999999 } }
     ])
+    .flatMap(el => el.requiresAbiV2 ? { ...el, abi: 2 } : [{ ...el, abi: 1 }, { ...el, abi: 2 }])
 
   const deployedFiles = await fs.readdir('deployed');
 
-  const done = solSolcProduct.map(async ({ name, sol, version, solc, libs, optimizer }) => {
-    const fileName = `${name} - ${!optimizer.enabled ? 'no' : optimizer.runs} ${version}`
+  const done = solSolcProduct.map(async ({ name, sol, v, version, solc, libs, optimizer, abi }) => {
+    const fileName = `${name} - v${version} abi${abi || (v >= 8 ? 2 : 1)} o${optimizer.enabled ? 1 : 0} runs${optimizer.runs}`
 
     if (deployedFiles.includes(fileName + '.hex'))
       return
+
+    if (v < 8 && abi === 2)
+      sol = 'pragma experimental ABIEncoderV2;\n' + sol
+    else if (v >= 8 && abi == 1)
+      sol = 'pragma abicoder v1;\n' + sol
 
     const input = {
       language: 'Solidity',
@@ -71,9 +88,9 @@
     }
 
     const output = JSON.parse(solc.compile(JSON.stringify(input)))
-    if (!output.contracts) {
+    if (output.errors.some(({ severity }) => severity === 'error')) {
       console.log('** FAIL', fileName, '**')
-      for (err of output.errors.filter(({ type }) => type.toLowerCase().includes('error')).slice(0,3))
+      for (err of output.errors.filter(({ severity }) => severity === 'error').slice(0,3))
         console.log(err.formattedMessage)
       return
     }

@@ -1,7 +1,9 @@
-# SolcOptions Database
+# Ethereum Smart-Contract Solc Options Data Set
+- Contains Ethereum-Smart-Contracts compiled with different solc-versions and options and the code to automate the compilation.
+- Can be used the to test Smart-Contract similarity measures.
 
 ## Summary
-- Tool and Database
+- Tool and Dataset
 - Complies the same solidity code with different solc versions and compile options.
 - Used for evaluation of evm-code similarity-measures (Ethereum Smart-Contract compare-functions).
 - supported solc versions 0.5.16 , 0.6.12 , 0.7.6 , 0.8.4

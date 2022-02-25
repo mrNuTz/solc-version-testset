@@ -13,6 +13,8 @@
         .map(pre => pre.textContent)
         .join('\n\n')
         .replace(/^import.+;\n/gm, '')
+        .replace(/^pragma experimental ABIEncoderV2;\n/gm, '')
+        .replace(/^pragma abicoder.+;\n/gm, '')
         .replace(/^\/\/ SPDX.+\n/gm, '')
         .replace(/\n\n\n/gm, '\n\n')
         .replace(/\n\n\n/gm, '\n\n')

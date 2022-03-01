@@ -1,5 +1,6 @@
 {
   "cSpell.words": [
+    "abicoder",
     "Bytecode",
     "CALLDATALOAD",
     "CALLDATASIZE",
@@ -9,17 +10,19 @@
     "JUMPDEST",
     "JUMPI",
     "KECCAK",
+    "Mainchain",
     "MLOAD",
     "MSTORE",
+    "Nonfungible",
     "RETURNDATACOPY",
     "RETURNDATASIZE",
     "SLOAD",
-    "SSTORE",
-    "STATICCALL",
-    "abicoder",
     "solcs",
     "sourcecopyarea",
-    "succ"
+    "SSTORE",
+    "STATICCALL",
+    "succ",
+    "Synthetix"
   ],
   "solidity.defaultCompiler": "localNodeModule"
 }
